@@ -50,3 +50,21 @@ class WorkflowTests(unittest.TestCase):
         self.assertNotIn('secrets.', text)
         self.assertNotIn('self-hosted', text)
         self.assertIn('unittest', text)
+
+    def test_terminal_state_skips_the_unused_tail(self):
+        jobs=self.workflow()['jobs']
+        for i in range(15):
+            previous='entry' if i==0 else f'collect_{i-1}'
+            for name in (f'tests_{i}',f'inspect_{i}'):
+                self.assertIn(f"needs.{previous}.outputs.terminal != 'true'",jobs[name]['if'])
+
+    def test_checks_use_separate_protected_app_credentials(self):
+        jobs=self.workflow()['jobs']
+        for name,job in jobs.items():
+            self.assertNotEqual(job.get('permissions',{}).get('checks'),'write')
+            steps=[s for s in job['steps'] if s.get('id')=='publisher-token']
+            if name in {'entry','finish'}:
+                self.assertEqual(job['environment'],'review-publisher')
+                self.assertEqual(len(steps),1)
+                self.assertEqual(steps[0]['with']['permission-checks'],'write')
+            else:self.assertFalse(steps)

@@ -42,6 +42,16 @@ class InstallTests(unittest.TestCase):
         self.assertIn("My checklist", template.read_text())
         self.assertEqual(template.read_text().count("<!-- review-guide:start -->"), 1)
 
+    def test_edits_inside_both_managed_blocks_survive_reinstallation(self):
+        self.install()
+        for name in ('AGENTS.md','.github/pull_request_template.md'):
+            path=self.target/name
+            path.write_text(path.read_text().replace('<!-- review-guide:end -->','Require authorization for all tool calls.\n<!-- review-guide:end -->'))
+        result=self.install()
+        self.assertEqual(result['conflicts'],[])
+        for name in ('AGENTS.md','.github/pull_request_template.md'):
+            self.assertIn('Require authorization for all tool calls.',(self.target/name).read_text())
+
     def test_failed_install_rolls_back_and_has_no_manifest(self):
         from runtime.review_guide.install import _atomic_write
         calls = 0
@@ -85,6 +95,8 @@ class InstallTests(unittest.TestCase):
                                 cwd=self.temp.name, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue((self.target / ".review/schemas/model-output.schema.json").is_file())
+        self.assertTrue((self.target / ".review/runtime/api/config.toml").is_file())
+        self.assertEqual(json.loads((self.target / ".review/runtime/api/isolation.json").read_text())["status"],"needs_verification")
 
     def test_installed_request_and_fake_model_need_no_source_bundle(self):
         from tests.test_codex import CodexTests, events

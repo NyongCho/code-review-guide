@@ -96,6 +96,9 @@ def advance(state: Json, event: Json, config: Json) -> Json:
     if model["status"] in {"incomplete", "failed", "needs_human"}:
         return _finish(result, model["status"], raw.get("reason", model["summary"]))
     if role in {"bugs", "security"}:
+        prior = {item["id"]: item for items in [result["open_findings"], *result["candidates"].values()] for item in items}
+        if any(item["id"] in prior and prior[item["id"]] != item for item in model["findings"]):
+            return _finish(result, "incomplete", "conflicting finding identity across reviewers")
         result["candidates"][role] = model["findings"]
         risk = classify_risk(result.get("changed_paths", []), model["risk"], cfg)["risk"]
         result["risk"] = max((risk, result.get("risk", "low")), key={"low": 0, "medium": 1, "high": 2}.get)

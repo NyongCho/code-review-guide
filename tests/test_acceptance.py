@@ -138,7 +138,7 @@ class AcceptanceTests(unittest.TestCase):
                     state=collect_state(state,cfg,outcomes,model(value),api,repo)
                 self.assertEqual(state['status'],'verified')
                 self.assertEqual(state['head_sha'],state['tested_head'])
-                for _ in range(2): publish_result(state,cfg,api)
+                for _ in range(2): publish_result(state,cfg,api,api)
                 self.assertEqual(len(transport.comments),1)
                 self.assertEqual(len(transport.checks),3)
                 self.assertTrue(all(c['head_sha']==state['head_sha'] for c in transport.checks))

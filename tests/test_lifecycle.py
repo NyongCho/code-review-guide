@@ -98,6 +98,16 @@ class LifecycleTests(unittest.TestCase):
         self.event("model_result", role="verify", result=output())
         self.assertEqual(self.state["status"], "incomplete")
 
+    def test_cross_reviewer_id_collision_cannot_dismiss_unrelated_finding(self):
+        self.event('tests_result',passed=True)
+        self.event('model_result',role='bugs',result=output([finding()]))
+        security=finding()|{'kind':'security','path':'auth/access.py','condition':'Missing ownership check','impact':'Another user can read data'}
+        self.event('model_result',role='security',result=output([security]))
+        if not self.state['terminal']:
+            self.event('model_result',role='verify',result=output()|{'dispositions':[{'id':finding()['id'],'decision':'dismissed','reason':'Duplicate total is expected'}]})
+        self.assertEqual(self.state['status'],'incomplete')
+        self.assertIn('identity',self.state['reason'])
+
     def test_observe_does_not_hide_failure(self):
         self.event("tests_result", passed=True)
         self.event("model_result", role="bugs", result=output() | {"status": "incomplete"})

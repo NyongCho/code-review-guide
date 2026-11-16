@@ -1,5 +1,7 @@
 # Code Review Guide Implementation Plan
 
+> 독립 구현 검토 보완: 필수 검사는 별도 게시 App에 묶고 strict 최신 branch를 요구한다. 승인할 변경 의도는 head commit 메시지로 고정하며 가변 PR 제목/본문은 승인 입력에서 제외한다. 근거와 테스트는 [구현 검토 기록](../reviews/2026-11-16-code-review.md)에 남긴다.
+
 > 구현 중 승인된 변경(2026-11-16): 사용자가 private 보호 기능의 Pro 제한 대신 공개 샘플 테스트를 선택했다. API만 public same-repo/허용 작성자로 확장하고 구독은 private를 유지한다. 서버 연결은 인증된 Actions runner 대신 보호 환경의 제한된 SSH worker로 구현한다. 아래 초기 설계/계획은 이 변경과 함께 읽으며 최신 증거는 [검증 상태](../../validation.md)를 따른다.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

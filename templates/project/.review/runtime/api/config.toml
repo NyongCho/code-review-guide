@@ -1,0 +1,12 @@
+# Replace the native binary path with the path verified on your hosted runner.
+default_permissions = "review"
+web_search = "disabled"
+project_doc_max_bytes = 0
+
+[permissions.review.filesystem]
+":minimal" = "read"
+"/home/runner/review-input" = "read"
+"/REPLACE_WITH_VERIFIED_NATIVE_CODEX_PATH" = "read"
+
+[permissions.review.network]
+enabled = false

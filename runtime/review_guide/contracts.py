@@ -204,11 +204,20 @@ def validate_eval_manifest(value: Json) -> Json:
     require(manifest.get("schema_version") == 1, "unsupported evaluation schema_version")
     for key in ("corpus_digest", "rubric_digest"):
         hex_digest(manifest.get(key), key)
+    configurations = manifest.get("configurations")
+    require(isinstance(configurations, dict) and len(configurations) == 2, "two frozen configurations required")
+    for identity, configuration in configurations.items():
+        require(isinstance(configuration, dict) and digest(configuration) == identity,
+                "frozen configuration digest mismatch")
+    order = manifest.get("configuration_order")
+    require(isinstance(order, list) and len(order) == 2 and set(order) == set(configurations),
+            "configuration order mismatch")
     require(isinstance(manifest.get("expected"), list) and bool(manifest["expected"]), "expected trials required")
     seen = set()
     for trial in manifest["expected"]:
         text(trial.get("case_id"), "case_id")
         hex_digest(trial.get("configuration_digest"), "configuration_digest")
+        require(trial["configuration_digest"] in configurations, "unknown trial configuration")
         integer(trial.get("trial_index"), "trial_index")
         key = (trial["case_id"], trial["configuration_digest"], trial["trial_index"])
         require(key not in seen, "duplicate expected trial")

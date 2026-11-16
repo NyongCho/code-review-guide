@@ -13,7 +13,7 @@ from pathlib import Path
 
 from .contracts import Json, digest, require, validate_config
 from .codex import build_request, run_codex, normalize_action
-from .github import GitHub, get_pr, input_digest, verify_entry, verify_current, publish_result, publish_patch
+from .github import GitHub, get_pr, input_digest, verify_entry, verify_current, publish_result, publish_patch, begin_checks, verify_merge_gate
 from .lifecycle import initial_state, advance
 from .workspace import prepare_workspace
 from .workflows import PYTHON_IMAGE, selected_result
@@ -156,6 +156,11 @@ def ci_main(operation: str, artifact_name=None, destination=None) -> Json:
     cfg = validate_config(read(repo/'.review/config.json'))
     token = os.environ.get('GH_TOKEN', '')
     api = GitHub(token)
+    publisher = None
+    if operation in {'entry', 'finish'}:
+        require(bool(os.environ.get('REVIEW_CHECK_TOKEN')), 'dedicated check publisher token required')
+        publisher = GitHub(os.environ['REVIEW_CHECK_TOKEN'])
+        verify_merge_gate(cfg, publisher)
     if operation.startswith("eval-"):
         from .eval_runtime import ci_eval_main
         return ci_eval_main(operation, repo, cfg, api)
@@ -177,6 +182,8 @@ def ci_main(operation: str, artifact_name=None, destination=None) -> Json:
         pr = get_pr(cfg['repository'], source['number'], api=api)
         verify_entry(pr, cfg, os.environ['GITHUB_REF'])
         require(pr['base']['sha'] == os.environ['GITHUB_WORKFLOW_SHA'], 'base moved since trusted workflow selection')
+        commit = api.call('GET', f'/repos/{cfg["repository"]}/commits/{pr["head"]["sha"]}')
+        require(commit['sha'] == pr['head']['sha'], 'intent commit mismatch')
         created = datetime.now(timezone.utc)
         state = {'schema_version': 1, 'repository': cfg['repository'], 'pr': pr['number'], 'base_sha': pr['base']['sha'],
                  'head_sha': pr['head']['sha'], 'policy_sha': os.environ['GITHUB_WORKFLOW_SHA'],
@@ -186,13 +193,16 @@ def ci_main(operation: str, artifact_name=None, destination=None) -> Json:
                  'model': cfg['model'], 'codex_version': cfg['codex_version'], 'runner': cfg.get('runner', 'linux'),
                  'round': 1, 'role': 'bugs', 'created_at': created.isoformat(),
                  'deadline_at': (created + timedelta(seconds=cfg['run_timeout_s'])).isoformat(),
-                 'status': 'incomplete', 'findings': [], 'evidence': [], 'intent': {'title': pr['title'], 'body': pr.get('body') or ''}}
+                 'status': 'incomplete', 'findings': [], 'evidence': [],
+                 'execution_id': os.environ['GITHUB_RUN_ID']+'-'+os.environ['GITHUB_RUN_ATTEMPT'],
+                 'intent': {'head_commit_message': commit['commit']['message']}}
         # GitHub's run created_at includes time waiting before the first job starts.
         metadata = api.call('GET', f'/repos/{cfg["repository"]}/actions/runs/{int(os.environ["GITHUB_RUN_ID"])}')
         started = datetime.fromisoformat(metadata['created_at'].replace('Z', '+00:00'))
         state['created_at'] = started.isoformat()
         state['deadline_at'] = (started + timedelta(seconds=cfg['run_timeout_s'])).isoformat()
         state = initial_state(state, cfg)
+        begin_checks(state, cfg, publisher)
         save_bundle(state, cfg, repo, token)
         manifest = read('out/workspace/input-manifest.json')
         state['changed_paths'] = manifest['changed_paths']
@@ -267,6 +277,6 @@ def ci_main(operation: str, artifact_name=None, destination=None) -> Json:
     require(operation == 'finish', 'unknown CI operation')
     if not state['terminal']:
         state = stop(state, 'incomplete', 'workflow stopped before terminal state')
-    result = publish_result(state, cfg, api)
+    result = publish_result(state, cfg, api, publisher)
     Path('out').mkdir(exist_ok=True); write('out/run.json', state); write('out/publication.json', result)
     return result

@@ -32,6 +32,8 @@ class Fake:
     def __call__(self, method, path, data=None):
         self.requests.append((method, path, data))
         if '/pulls/1' in path: return copy.deepcopy(self.pr)
+        if '/branches/main/protection' in path:return {'required_status_checks':{'strict':True,'checks':[{'context':'review-guide/'+name,'app_id':4242} for name in ('ci','human')]},'enforce_admins':{'enabled':True}}
+        if '/commits/' in path and 'check-runs' not in path:return {'sha':self.pr['head']['sha'],'commit':{'message':'Count every item; preserve duplicates'}}
         if '/actions/workflows/' in path: return {'workflow_runs': []}
         if '/permission' in path: return {'permission': 'admin'}
         if path.endswith('/runs/17'): return self.approval
@@ -42,7 +44,7 @@ class Fake:
         if '/issues/comments/' in path: self.comments[0].update(data); return self.comments[0]
         if path.endswith('/check-runs') or '/check-runs?' in path:
             if method == 'GET': return {'check_runs': self.checks, 'total_count': len(self.checks)}
-            obj = {'id': len(self.checks)+1, 'app': {'slug': 'github-actions'}, **data}; self.checks.append(obj); return obj
+            obj = {'id': len(self.checks)+1, 'app': {'id':4242,'slug': 'review-publisher'}, **data}; self.checks.append(obj); return obj
         if '/check-runs/' in path:
             obj = next(c for c in self.checks if c['id'] == int(path.rsplit('/',1)[1])); obj.update(data); return obj
         raise AssertionError((method, path, data))
@@ -52,6 +54,7 @@ class GitHubTests(unittest.TestCase):
     def setUp(self):
         self.fake = Fake()
         self.api = GitHub('unused', self.fake)
+        self.publisher = GitHub('dedicated-app',self.fake)
         self.run = sample_run() | {'input_digest': input_digest(self.fake.pr)}
 
     def test_key_includes_base_and_intent(self):
@@ -77,17 +80,23 @@ class GitHubTests(unittest.TestCase):
         current['user']['login']='owner';current['head']['repo']['full_name']='fork/project'
         with self.assertRaises(ValidationError):verify_entry(current,cfg,'refs/heads/main')
 
+    def test_mutable_pr_description_is_not_merge_authority(self):
+        original=pr();edited=copy.deepcopy(original);edited['body']='Different mutable description'
+        self.assertEqual(input_digest(original),input_digest(edited))
+        edited['head']['sha']='f'*40
+        self.assertNotEqual(input_digest(original),input_digest(edited))
+
     def test_stale_head_base_and_intent(self):
         for field, value, reason in [('head', '0'*40, 'stale_head'), ('base', '0'*40, 'stale_input')]:
             current = pr(); current[field]['sha'] = value
             self.assertEqual(verify_current(self.run, current)['reason'], reason)
-        current = pr(); current['body'] = 'Different intent'
+        current = pr(); current['base']['repo']['full_name'] = 'other/project'
         self.assertEqual(verify_current(self.run, current)['reason'], 'stale_input')
 
     def test_publication_is_idempotent_and_does_not_hide_incomplete(self):
         state = initial_state(self.run, sample_config())
         state.update(terminal=True, status='incomplete', ci_status='passed', tested_head=state['head_sha'])
-        for _ in range(2): publish_result(state, sample_config(), self.api)
+        for _ in range(2): publish_result(state, sample_config(), self.api, self.publisher)
         self.assertEqual(len(self.fake.comments), 1)
         self.assertEqual(len(self.fake.checks), 3)
         by_name = {c['name']: c for c in self.fake.checks}
@@ -97,7 +106,7 @@ class GitHubTests(unittest.TestCase):
         self.assertEqual(self.fake.checks[0]['conclusion'], 'neutral')
         self.assertIn('incomplete', self.fake.comments[0]['body'])
         self.fake.pr['head']['sha'] = '0'*40
-        self.assertEqual(publish_result(state, sample_config(), self.api)['reason'], 'stale_head')
+        self.assertEqual(publish_result(state, sample_config(), self.api, self.publisher)['reason'], 'stale_head')
 
     def test_worker_cannot_forge_approval(self):
         expected = {'head_sha': 'b'*40}
@@ -128,6 +137,34 @@ class GitHubTests(unittest.TestCase):
             payload = stream.getvalue(); meta['digest'] = 'sha256:' + hashlib.sha256(payload).hexdigest()
             with self.assertRaises(ValidationError): verify_archive(payload, meta, expected, Path(tmp)/'bad')
 
+    def test_wrong_publisher_cannot_satisfy_checks_and_gate_requires_exact_app(self):
+        from runtime.review_guide.github import begin_checks, verify_merge_gate
+        cfg=sample_config()
+        class Wrong:
+            def collection(self,*a):return []
+            def call(self,*a):return {'id':1,'app':{'id':15368,'slug':'github-actions'}}
+        with self.assertRaises(ValidationError):begin_checks(self.run,cfg,Wrong())
+        class Gate:
+            def __init__(self,app):self.app=app
+            def call(self,*a):return {'required_status_checks':{'strict':True,'checks':[
+                {'context':'review-guide/ci','app_id':self.app},{'context':'review-guide/human','app_id':self.app}]},'enforce_admins':{'enabled':True}}
+        with self.assertRaises(ValidationError):verify_merge_gate(cfg,Gate(15368))
+        verify_merge_gate(cfg,Gate(4242))
+
+    def test_new_entry_marks_prior_success_pending_and_stale_base_cancels_it(self):
+        from runtime.review_guide.github import begin_checks
+        state=initial_state(self.run,sample_config())
+        state.update(terminal=True,status='verified',ci_status='passed',tested_head=state['head_sha'],risk='low')
+        publish_result(state,sample_config(),self.api,self.publisher)
+        begin_checks(state,sample_config(),self.publisher)
+        self.assertTrue(all(c['status']=='in_progress' for c in self.fake.checks))
+        publish_result(state,sample_config(),self.api,self.publisher)
+        self.fake.pr['base']['sha']='c'*40
+        result=publish_result(state,sample_config(),self.api,self.publisher)
+        self.assertEqual(result['reason'],'stale_input')
+        self.assertTrue(all(c['conclusion']=='cancelled' for c in self.fake.checks))
+
+
 class PatchTests(unittest.TestCase):
     def test_patch_retry_recovers_lost_push_response_without_second_commit(self):
         from runtime.review_guide.github import publish_patch
@@ -140,7 +177,7 @@ class PatchTests(unittest.TestCase):
             expected_tree = git(repo, 'rev-parse', fixed + '^{tree}')
             current = pr(); current['base']['sha'] = current['head']['sha'] = head
             run = sample_run() | {'base_sha': head, 'head_sha': head, 'input_digest': input_digest(current),
-                                  'fix_paths': ['src/total.py'], 'created_at': '2026-11-16T00:00:00Z'}
+                                  'intent': {'head_commit_message':'Count every item; preserve duplicates'}, 'fix_paths': ['src/total.py'], 'created_at': '2026-11-16T00:00:00Z'}
             cfg = validate_config(sample_config() | {'auto_fix': True})
             commits, patches = [], []
             def transport(method, path, data=None):
@@ -164,6 +201,7 @@ class PatchTests(unittest.TestCase):
             self.assertEqual(first['status'], 'verified')
             self.assertEqual(second, first)
             self.assertEqual(len(commits), 1)
+            self.assertIn('Count every item; preserve duplicates',commits[0]['message'])
             self.assertEqual(len(patches), 1)
             self.assertFalse(patches[0]['force'])
             commits[0]['tree'] = '0'*40

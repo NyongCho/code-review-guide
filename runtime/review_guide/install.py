@@ -83,11 +83,16 @@ def plan_install(target: Path, bundle: Path, config: Json) -> Json:
     block = ("리뷰 체계의 첫 배포·인증 도입·마이그레이션·사고·모델 변경 시 "
              "`.agents/skills/review-maintain/SKILL.md`를 읽고 점검한다.\n"
              "PR 리뷰 기준은 `REVIEW.md`, 실행 정책과 검증 상태는 `.review/`에 있다.\n")
-    local_agents = _read(safe_target(target, "AGENTS.md")) or ""
-    files["AGENTS.md"] = _managed(local_agents, block)
     pr_template = ".github/pull_request_template.md"
+    managed = {"AGENTS.md": block}
     if pr_template in files:
-        files[pr_template] = _managed(_read(safe_target(target, pr_template)) or "", files[pr_template])
+        managed[pr_template] = files[pr_template]
+    for relative, body in managed.items():
+        base = previous.get("files", {}).get(relative, {}).get("base")
+        local = _read(safe_target(target, relative)) or ""
+        # The incoming side starts from the recorded baseline, including its block.
+        # Local instructions inside and outside the block take the normal merge path.
+        files[relative] = _managed(base if base is not None else local, body)
     writes, expected, conflicts, baselines = {}, {}, [], {}
     for relative, incoming in files.items():
         path = safe_target(target, relative)
@@ -95,8 +100,7 @@ def plan_install(target: Path, bundle: Path, config: Json) -> Json:
         base = previous.get("files", {}).get(relative, {}).get("base")
         expected[relative] = local
         baselines[relative] = {"base": incoming, "sha256": hashlib.sha256(incoming.encode()).hexdigest()}
-        if relative in {"AGENTS.md", pr_template}:
-            # Only replace our block; surrounding user text is the current input.
+        if relative in managed and base is None and START not in (local or ""):
             merged = incoming
         elif local is None or local == base or local == incoming:
             merged = incoming

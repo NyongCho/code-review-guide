@@ -35,13 +35,27 @@
         ],
         "additionalProperties": false
       }
+    },
+    "configurations": {
+      "type": "object"
+    },
+    "configuration_order": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
     }
   },
   "required": [
     "schema_version",
     "corpus_digest",
     "rubric_digest",
-    "expected"
+    "expected",
+    "configurations",
+    "configuration_order"
   ],
   "additionalProperties": true
 }

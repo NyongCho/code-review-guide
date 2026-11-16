@@ -7,7 +7,7 @@ from pathlib import Path
 
 from runtime.review_guide.contracts import (
     ValidationError, validate_config, validate_output, validate_run,
-    validate_case, validate_eval_manifest,
+    validate_case, validate_eval_manifest, digest,
 )
 from tests.fixtures import ROOT, finding, output, sample_config, sample_run
 
@@ -67,9 +67,11 @@ class ContractTests(unittest.TestCase):
             validate_case(case | {"status": "confirmed"})
 
     def test_eval_manifest_rejects_duplicate_trial(self):
-        trial = {"case_id": "duplicate", "configuration_digest": "b" * 64, "trial_index": 1}
+        configs = [{"model":"old"},{"model":"new"}]
+        trial = {"case_id": "duplicate", "configuration_digest": digest(configs[0]), "trial_index": 1}
         manifest = {"schema_version": 1, "corpus_digest": "a" * 64,
-                    "rubric_digest": "c" * 64, "expected": [trial]}
+                    "rubric_digest": "c" * 64, "expected": [trial],
+                    "configurations": {digest(c):c for c in configs}, "configuration_order":[digest(c) for c in configs]}
         validate_eval_manifest(manifest)
         with self.assertRaises(ValidationError):
             validate_eval_manifest(manifest | {"expected": [trial, trial]})

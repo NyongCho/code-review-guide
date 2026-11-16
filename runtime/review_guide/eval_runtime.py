@@ -9,7 +9,7 @@ from pathlib import Path
 
 from .cases import checked_case, materialize_case
 from .codex import build_request, run_codex
-from .contracts import Json, digest, require, validate_config
+from .contracts import Json, digest, require, validate_config, validate_eval_manifest
 
 ROLES = ('bugs', 'security', 'verify')
 
@@ -21,6 +21,7 @@ def describe_tools(profile: Path) -> str:
 
 def prepare_trial(manifest: Json, case: Path, configuration_digest: str, trial_index: int,
                   workspace: Path, started_at: str | None = None) -> Json:
+    manifest = validate_eval_manifest(manifest)
     record = checked_case(case)
     key = {'case_id':record['id'], 'configuration_digest':configuration_digest, 'trial_index':trial_index}
     require(key in manifest['expected'], 'trial not declared in frozen manifest')

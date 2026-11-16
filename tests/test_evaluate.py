@@ -38,6 +38,11 @@ class EvaluationTests(unittest.TestCase):
         return compare_runs(self.manifest, self.baseline if baseline is None else baseline,
                             self.candidate if candidate is None else candidate, self.rubric)
 
+    def test_frozen_configuration_contents_must_match_digest(self):
+        candidate_id=self.manifest['configuration_order'][1]
+        self.manifest['configurations'][candidate_id]['model']='unapproved-third-model'
+        with self.assertRaises(ValidationError):self.compare()
+
     def test_critical_three_trials_and_eligible_still_requires_human(self):
         self.assertEqual(len(self.manifest['expected']), 8)
         report = self.compare()

@@ -6,7 +6,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def sample_config(mode="self_hosted"):
     return {"schema_version": 1, "mode": mode, "repository": "example/project",
             "model": "gpt-6-astra", "effort": "low", "codex_version": "0.169.0",
-            "test_commands": [["python3", "-m", "unittest", "discover"]]}
+            "check_publisher_app_id": 4242, "test_commands": [["python3", "-m", "unittest", "discover"]]}
 
 
 def sample_run():

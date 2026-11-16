@@ -1,0 +1,14 @@
+{
+  "status": "needs_verification",
+  "policy_digest": "REPLACE_WITH_SHA256_OF_VERIFIED_CONFIG",
+  "codex_version": "0.169.0",
+  "mode": "api",
+  "runner": "linux",
+  "checks": {
+    "secret_read_denied": false,
+    "network_denied": false,
+    "instructions_inert": false,
+    "privilege_escalation_denied": false
+  },
+  "evidence": "Run credential-free canaries before enabling this runtime."
+}

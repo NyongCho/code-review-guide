@@ -57,7 +57,7 @@ class PipelineTests(unittest.TestCase):
             self.fake.pr['base']['sha'] = self.fake.pr['head']['sha'] = head
             env = {'GITHUB_EVENT_PATH': str(root/'event.json'), 'GITHUB_REF': 'refs/heads/main',
                    'GITHUB_WORKFLOW_SHA': head, 'GITHUB_RUN_ID': '42', 'GITHUB_RUN_ATTEMPT': '1',
-                   'GITHUB_OUTPUT': str(root/'outputs'), 'TEST_OUTCOME': 'success',
+                   'GITHUB_OUTPUT': str(root/'outputs'), 'TEST_OUTCOME': 'success', 'REVIEW_CHECK_TOKEN':'fixture-app-token',
                    'SELF_HOSTED_OUTCOME': 'skipped', 'API_OUTCOME': 'skipped'}
             (root/'event.json').write_text('{"number":1}')
             original = self.fake.__call__
@@ -71,6 +71,9 @@ class PipelineTests(unittest.TestCase):
                 os.chdir(root)
                 with patch.dict(os.environ, env), patch('runtime.review_guide.pipeline.GitHub', return_value=GitHub('unused', transport)), patch('runtime.review_guide.pipeline.fetch'):
                     ci_main('entry')
+                    initial=json.loads(Path('out/state.json').read_text())
+                    self.assertEqual(initial['intent']['head_commit_message'],'Count every item; preserve duplicates')
+                    self.assertTrue(all(c['status']=='in_progress' for c in self.fake.checks))
                     shutil.move('out', 'input')
                     Path('test-output').mkdir()
                     Path('test-output/test-result.json').write_text(json.dumps({'status':'passed','head_sha':head}))

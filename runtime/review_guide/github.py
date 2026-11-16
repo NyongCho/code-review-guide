@@ -61,7 +61,6 @@ def get_pr(repo: str, number: int, token: str = '', api: GitHub | None = None) -
 
 def input_digest(pr: Json) -> str:
     return digest({'base': pr['base']['sha'], 'head': pr['head']['sha'],
-                   'title': pr['title'], 'body': pr.get('body') or '',
                    'base_repo': pr['base']['repo']['full_name'],
                    'head_repo': pr['head']['repo']['full_name']})
 
@@ -110,10 +109,50 @@ def resolve_approval(reference: Json, expected: Json, api: GitHub) -> VerifiedAp
     return VerifiedApproval(expected, run['triggering_actor']['login'], f'https://github.com/{reference["repository"]}/actions/runs/{run_id}')
 
 
-def publish_result(run: Json, config: Json, api: GitHub) -> Json:
+def verify_merge_gate(config: Json, publisher: GitHub) -> None:
+    app_id = config.get('check_publisher_app_id')
+    require(type(app_id) is int and app_id > 0 and app_id != 15368, 'dedicated check publisher App required')
+    branch = validate_config(config)['trusted_ref'].removeprefix('refs/heads/')
+    protection = publisher.call('GET', route(config['repository'])+'/branches/'+quote(branch,safe='')+'/protection')
+    checks = protection.get('required_status_checks') or {}
+    require(checks.get('strict') is True and protection.get('enforce_admins',{}).get('enabled') is True,
+            'strict up-to-date branch protection including administrators required')
+    required = {'review-guide/ci','review-guide/human'}
+    if config.get('review_mode') == 'block':required.add('review-guide/ai')
+    bound = {c.get('context') for c in checks.get('checks',[]) if c.get('app_id') == app_id}
+    require(required.issubset(bound), 'required checks must be bound to the dedicated publisher App')
+
+
+def _write_checks(run: Json, config: Json, publisher: GitHub, checks: Json, summary: str,
+                  pending=False, existing_only=False) -> None:
+    app_id = config.get('check_publisher_app_id')
+    require(type(app_id) is int and app_id > 0 and app_id != 15368, 'dedicated check publisher App required')
+    root, key = route(run['repository']), run_key(run)
+    runs = publisher.collection(f'{root}/commits/{run["head_sha"]}/check-runs', 'check_runs')
+    for name in ('ai','ci','human'):
+        external = key + ':' + run.get('execution_id','local') + ':' + name
+        existing = next((c for c in runs if c.get('external_id') == external and c.get('app',{}).get('id') == app_id),None)
+        if existing_only and existing is None:continue
+        data = {'name':'review-guide/'+name,'head_sha':run['head_sha'],
+                'status':'in_progress' if pending else 'completed', 'external_id':external,
+                'conclusion':None if pending else checks[name],
+                'output':{'title':'Review pending' if pending else run['status'],'summary':summary}}
+        written = publisher.call('PATCH' if existing else 'POST',
+                  f'{root}/check-runs/{existing["id"]}' if existing else f'{root}/check-runs',data)
+        require(written.get('app',{}).get('id') == app_id, 'check was not written by the configured publisher App')
+
+
+def begin_checks(run: Json, config: Json, publisher: GitHub) -> None:
+    _write_checks(run,config,publisher,{},'Trusted review is running for this commit.',pending=True)
+
+
+def publish_result(run: Json, config: Json, api: GitHub, publisher: GitHub) -> Json:
     current = get_pr(run['repository'], run['pr'], api=api)
     freshness = verify_current(run, current)
     if freshness['status'] != 'verified':
+        if current['head']['sha'] == run['head_sha']:
+            _write_checks(run,config,publisher,{name:'cancelled' for name in ('ai','ci','human')},
+                          'Superseded input: '+freshness['reason'],existing_only=True)
         return freshness
     key, root = run_key(run), route(run['repository'])
     run = dict(run)
@@ -143,16 +182,7 @@ def publish_result(run: Json, config: Json, api: GitHub) -> Json:
         api.call('PATCH', f'{root}/issues/comments/{existing["id"]}', {'body': body})
     else:
         api.call('POST', f'{root}/issues/{run["pr"]}/comments', {'body': body})
-    runs = api.collection(f'{root}/commits/{run["head_sha"]}/check-runs', 'check_runs')
-    for name in ('ai', 'ci', 'human'):
-        external = key + ':' + name
-        existing = next((c for c in runs if c.get('external_id') == external
-                         and c.get('app', {}).get('slug') == 'github-actions'), None)
-        data = {'name': 'review-guide/' + name, 'head_sha': run['head_sha'], 'status': 'completed',
-                'conclusion': checks[name], 'external_id': external,
-                'output': {'title': run['status'], 'summary': summary}}
-        api.call('PATCH' if existing else 'POST',
-                 f'{root}/check-runs/{existing["id"]}' if existing else f'{root}/check-runs', data)
+    _write_checks(run,config,publisher,checks,summary)
     return {'status': 'published', 'key': key, 'checks': checks}
 
 
@@ -205,6 +235,9 @@ def publish_patch(run: Json, patch: str, config: Json, repo: Path, api: GitHub) 
         return decision
     root = route(run['repository'])
     marker = 'review-guide patch ' + digest({'run': run_key(run), 'patch': patch})
+    intent = run.get('intent', {}).get('head_commit_message')
+    if intent:
+        marker += '\n\nOriginal change intent:\n' + intent
     env = {'PATH': os.environ.get('PATH', '/usr/bin:/bin'), 'GIT_CONFIG_NOSYSTEM': '1', 'HOME': '/nonexistent'}
     with tempfile.TemporaryDirectory(prefix='review-patch-') as tmp:
         work = Path(tmp)/'tree'

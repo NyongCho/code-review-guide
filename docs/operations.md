@@ -7,7 +7,7 @@
 1. [사용자 인증 안내](../scripts/setup-access.sh)를 필요한 경우 본인 터미널에서 실행한다. 키는 채팅이나 `.env`로 전달하지 않는다.
 2. [서버](setup-self-hosted.md) 또는 [API](setup-api.md) 경로의 실제 계정·버전·읽기/네트워크/권한 상승·지침 발견·보호 환경/ref 제한을 확인한다. 실제 증거 없이 status만 바꾸지 않는다.
 3. 선택한 mode의 샘플에서 정상/버그/민감 PR을 실행한다. source snapshot의 base/head/input digest와 게시된 check의 SHA가 맞아야 한다.
-4. GitHub Rules/Branch protection에서 `review-guide/ci`, `review-guide/human`을 required checks로 연결한다. AI 차단 전환 후에는 `review-guide/ai`도 연결한다. 실패 check가 실제 머지를 막는지 음성 검사한다. private 저장소에서 필요한 보호 기능을 제공하지 않는 플랜이면 검증 완료로 표시하지 않는다.
+4. [전용 게시 App](setup-publisher.md)을 구성하고 `review-guide/ci`, `review-guide/human`을 그 App ID에 묶어 required checks로 연결한다. strict 최신 branch 요구와 관리자 적용도 켠다. AI 차단 전환 후에는 `review-guide/ai`도 연결한다. 실패 check가 실제 머지를 막는지 음성 검사한다. private 저장소에서 필요한 보호 기능을 제공하지 않는 플랜이면 검증 완료로 표시하지 않는다.
 
 AI 관찰 모드의 neutral은 리뷰 성공을 뜻하지 않는다. 댓글에 `incomplete`/`failed`가 있으면 실행 문제다. CI 성공은 같은 head의 컨테이너 검사 결과로만 게시한다. 사람 확인은 위험도에 따라 별도로 판정한다. 1인 프로젝트는 한 명의 확인이며 독립된 두 사람의 승인이 아니다.
 
@@ -30,7 +30,7 @@ AI 관찰 모드의 neutral은 리뷰 성공을 뜻하지 않는다. 댓글에 `
 | 인증 만료 | 전용 계정에서 고정 CLI의 `login --help`와 `login status` 지원을 확인한 뒤 본인이 다시 로그인한다. 개인 auth 파일을 복사하지 않는다. |
 | 구독 한도/API 오류 | 해당 경로에서 실패로 남긴다. 한도/모델 접근을 확인하고 같은 mode로 다시 실행한다. 자동 과금 우회는 없다. |
 | timeout / deadline | `deadline_at`과 실제 시작/queue 시간을 확인한다. 이미 만료한 실행은 새 모델 호출·push를 하지 않는다. 현재 입력으로 새 실행을 시작한다. |
-| stale_head / stale_input | 최신 PR의 base/head/제목/설명이 바뀐 것이므로 과거 결과를 재사용하지 않는다. 현재 PR 입력으로 다시 실행한다. |
+| stale_head / stale_input | 최신 PR의 base/head 또는 저장소 입력이 바뀐 것이므로 과거 결과를 재사용하지 않는다. 현재 PR 입력으로 다시 실행한다. |
 | push 후 응답 유실 | publisher가 parent와 예상 patch tree를 재조회한다. 다른 head를 덮어쓰지 않는다. 사람이 force-push로 복구하지 않는다. |
 | artifact 누락/보존 만료 | 출처/run/attempt/digest가 검증되지 않는 자료로 복구하지 않는다. 현재 입력으로 새 실행을 만들고 이전 실행은 미완료로 남긴다. |
 | 중요 지적 지속/3회 한도 | `needs_human`의 근거와 패치 범위를 확인한다. 마지막 수정도 tests+fresh review를 생략하지 않는다. |
@@ -69,3 +69,5 @@ python3 /path/to/new-guide/runtime/reviewctl.py install \
 제안된 변경과 충돌을 검토하고 적용한 뒤 생성 workflow와 프로젝트 테스트를 검사한다. `max_rounds` 변경은 DAG 재생성이 필요하다. runtime/profile/CLI가 바뀌면 격리 증거를 새로 만들고 모델 변경이면 고정 문제집 비교를 다시 수행한다. rollback은 검증된 이전 설치 commit과 당시 CLI/profile을 함께 되돌린다. 기존 model의 인증이 실패했다고 다른 과금 경로를 활성화하지 않는다.
 
 첫 배포 전에는 `.review/layers.json`의 6·7번을 다시 검토한다. 실제 통합 검사, 기능 차단/롤백 명령, 감지 지표·연락 담당과 rehearsal 증거가 생겨야 상태를 갱신한다. 사고 후에는 어느 계층이 잡았어야 했는지 기록하고 재현 가능한 회귀 검사와 사례 후보를 만든다.
+
+OpenAI 프로젝트의 Limits → Spend에서 **Enforce a hard limit**를 설정할 수 있다. 알림만 설정하는 것과 구분한다. 집행 지연으로 소액 초과가 가능하므로 승인 예산보다 낮은 한도와 여유분을 두고, 실제 호출을 직렬로 확인한다. 다른 작업이 함께 쓰는 프로젝트의 총사용량도 포함한다. [공식 비용 제한 안내](https://developers.openai.com/api/docs/guides/spend-limits)

@@ -7,6 +7,7 @@ from .codex import _failure
 CHECKOUT = 'actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a'
 UPLOAD = 'actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9'
 DOWNLOAD = 'actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333'
+APP_TOKEN = 'actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349'
 CODEX_ACTION = 'openai/codex-action@13e9c17417b29e9a276f73ec6ed7fb574137d3c3'
 PYTHON_IMAGE = 'python:3.12-slim@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b'
 CLI = 'python3 trusted/.review/bin/reviewctl.py ci '
@@ -51,20 +52,24 @@ def render_workflows(config: Json) -> dict[str, str]:
     cfg = validate_config(config)
     days = cfg['retention_days']
     read = {'contents': 'read', 'actions': 'read'}
-    write = read | {'contents': 'write', 'pull-requests': 'write', 'checks': 'write'}
+    write = read | {'contents': 'write', 'pull-requests': 'write'}
     token = {'GH_TOKEN': '${{ github.token }}'}
+    publisher = token | {'REVIEW_CHECK_TOKEN':'${{ steps.publisher-token.outputs.token }}'}
+    mint = {'id':'publisher-token','uses':APP_TOKEN,'with':{
+        'app-id':'${{ vars.REVIEW_APP_ID }}','private-key':'${{ secrets.REVIEW_APP_PRIVATE_KEY }}',
+        'permission-checks':'write','permission-contents':'read','permission-administration':'read'}}
     jobs = {'entry': {'runs-on': 'ubuntu-24.04', 'timeout-minutes': 5, 'permissions': read,
-                     'outputs': outputs(), 'steps': [checkout(), command('entry', token, id='control'),
+                     'environment':'review-publisher', 'outputs': outputs(), 'steps': [checkout(), mint, command('entry', publisher, id='control'),
                                                      upload('entry', 'out', days)]}}
     previous, state_name = 'entry', 'entry'
     # Each repair gets bugs/security/verify/fix, and the final repair ALWAYS gets three fresh reviews.
     for i in range(cfg['max_rounds'] * 4 + 3):
         tests, inspect, collect = f'tests_{i}', f'inspect_{i}', f'collect_{i}'
-        jobs[tests] = {'needs': [previous], 'if': "${{ !cancelled() && needs." + previous + ".result == 'success' }}",
+        jobs[tests] = {'needs': [previous], 'if': "${{ !cancelled() && needs." + previous + ".result == 'success' && needs." + previous + ".outputs.terminal != 'true' }}",
                       'runs-on': 'ubuntu-24.04', 'timeout-minutes': 15, 'permissions': read,
                       'steps': [checkout(), download(state_name, 'input'), command('tests'),
                                 upload(tests, 'test-result.json', days)]}
-        jobs[inspect] = {'needs': [previous, tests], 'if': "${{ always() && !cancelled() && needs." + previous + ".result == 'success' }}",
+        jobs[inspect] = {'needs': [previous, tests], 'if': "${{ always() && !cancelled() && needs." + previous + ".result == 'success' && needs." + previous + ".outputs.terminal != 'true' }}",
                         'runs-on': 'ubuntu-24.04', 'timeout-minutes': 5, 'permissions': read, 'outputs': outputs(),
                         'steps': [checkout(), download(state_name, 'input'),
                                   download(tests, 'test-output') | {'if': '${{ needs.' + tests + ".result == 'success' }}"},
@@ -106,9 +111,9 @@ def render_workflows(config: Json) -> dict[str, str]:
                          'runs-on': 'ubuntu-24.04', 'timeout-minutes': 10, 'permissions': write,
                          'outputs': outputs(), 'steps': steps}
         previous, state_name = collect, collect
-    jobs['finish'] = {'needs': list(jobs), 'if': "${{ always() && !cancelled() && needs.entry.result == 'success' }}",
+    jobs['finish'] = {'needs': list(jobs), 'if': "${{ always() && needs.entry.result == 'success' }}",
                       'runs-on': 'ubuntu-24.04', 'timeout-minutes': 5, 'permissions': write,
-                      'steps': [checkout(), command('finish', token | {'JOB_OUTCOMES': '${{ toJSON(needs) }}'}),
+                      'environment':'review-publisher', 'steps': [checkout(), mint, command('finish', publisher | {'JOB_OUTCOMES': '${{ toJSON(needs) }}'}),
                                 upload('record', 'out', days)]}
     workflow = {'name': 'Project AI review', 'on': {'pull_request_target': {'types': ['opened', 'synchronize', 'reopened', 'edited', 'ready_for_review']}},
                 'permissions': {}, 'concurrency': {'group': 'review-${{ github.event.pull_request.number }}', 'cancel-in-progress': True},

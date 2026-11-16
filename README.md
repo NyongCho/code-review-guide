@@ -32,7 +32,7 @@ python3 runtime/reviewctl.py install --target /path/to/project --config project-
 python3 runtime/reviewctl.py install --target /path/to/project --config project-config.json --apply
 ```
 
-설치 결과에는 `AGENTS.md` 안내, `REVIEW.md`, 프로젝트별 maintain 스킬, `.review/` 실행기·schema·프롬프트·계층 상태, PR/승인/평가 워크플로가 들어간다. 런타임 격리와 GitHub 진입 제한을 실검증하기 전에는 모델을 호출하지 않는다. 생성된 검사 이름과 required checks를 연결하는 설정은 [운영 안내](docs/operations.md)에 정리한다.
+설치 결과에는 `AGENTS.md` 안내, `REVIEW.md`, 프로젝트별 maintain 스킬, `.review/` 실행기·schema·프롬프트·계층 상태, PR/승인/평가 워크플로가 들어간다. 런타임 격리와 GitHub 진입 제한을 실검증하기 전에는 모델을 호출하지 않는다. 필수 검사에는 [별도 게시 App](docs/setup-publisher.md)의 출처와 strict 최신 branch 요구를 연결한다. 변경 목적은 head commit 메시지에 기록한다. 상세 설정은 [운영 안내](docs/operations.md)에 정리한다.
 
 ## 유지와 모델 변경
 
