@@ -43,6 +43,38 @@ class PipelineTests(unittest.TestCase):
         self.assertTrue(state['terminal'])
         self.assertEqual(state['status'], 'incomplete')
 
+    def test_artifact_commit_binds_to_current_run_while_policy_stays_separate(self):
+        import json, os
+        from runtime.review_guide.pipeline import ci_main
+        from runtime.review_guide.contracts import ValidationError
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root/'trusted/.review').mkdir(parents=True)
+            (root/'trusted/.review/config.json').write_text(json.dumps(self.cfg))
+            env = {'GITHUB_RUN_ID':'42', 'GITHUB_RUN_ATTEMPT':'2', 'GITHUB_WORKFLOW_SHA':'a'*40}
+            metadata = {'id':42, 'run_attempt':2, 'head_sha':'b'*40}
+            def transport(method, path, data=None):
+                self.assertEqual((method, path), ('GET', '/repos/example/project/actions/runs/42'))
+                return metadata
+            cwd = Path.cwd()
+            try:
+                os.chdir(root)
+                with patch.dict(os.environ, env), patch('runtime.review_guide.pipeline.GitHub', return_value=GitHub('unused', transport)), \
+                        patch('runtime.review_guide.github.download_artifact') as download:
+                    ci_main('fetch-artifact', 'entry', 'input')
+                    self.assertEqual(download.call_args.args[1],
+                                     {'name':'42-2-entry', 'run_id':42, 'head_sha':'b'*40})
+                    metadata['run_attempt'] = 3
+                    with self.assertRaises(ValidationError):
+                        ci_main('fetch-artifact', 'entry', 'input')
+                    self.assertEqual(download.call_count, 1)
+                    (root/'input').mkdir()
+                    (root/'input/state.json').write_text(json.dumps(self.state | {'policy_sha':'b'*40}))
+                    with self.assertRaisesRegex(ValidationError, 'trusted policy/config mismatch'):
+                        ci_main('tests')
+            finally:
+                os.chdir(cwd)
+
     def test_entry_through_collect_uses_installed_cli_and_real_git_snapshot(self):
         import json, os, shutil
         from runtime.review_guide.pipeline import ci_main
