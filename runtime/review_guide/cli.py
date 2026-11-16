@@ -40,12 +40,16 @@ def main(argv: list[str] | None = None) -> int:
     for name in ("config", "state", "event", "output"):
         transition.add_argument("--" + name, type=Path, required=True)
     ci = sub.add_parser("ci", help="protected workflow controller; not a worker API")
-    ci.add_argument("operation", choices=["entry", "tests", "inspect", "prepare-worker", "worker", "normalize-worker", "collect", "finish", "approval", "fetch-artifact"])
+    ci.add_argument("operation", choices=["entry", "tests", "inspect", "prepare-worker", "worker", "normalize-worker", "collect", "finish", "approval", "fetch-artifact", "eval-entry", "eval-self-hosted", "eval-request", "eval-normalize", "eval-record"])
     ci.add_argument("--name")
     ci.add_argument("--destination", type=Path)
+    from .knowledge_cli import register, execute
+    register(sub)
     args = parser.parse_args(argv)
     try:
-        if args.command == "validate":
+        if args.command in {"case", "eval"}:
+            result = execute(args)
+        elif args.command == "validate":
             result = validate_config(json.loads(args.config.read_text()))
         elif args.command == "install":
             proposal = plan_install(args.target, args.bundle, json.loads(args.config.read_text()))

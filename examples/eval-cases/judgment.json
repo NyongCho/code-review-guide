@@ -1,0 +1,9 @@
+{
+  "reason": "REPLACE after inspecting this trial against the confirmed case",
+  "matches": {
+    "bugs": {},
+    "security": {},
+    "verify": {}
+  },
+  "extras": {}
+}

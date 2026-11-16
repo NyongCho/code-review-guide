@@ -140,6 +140,9 @@ def save_bundle(state, cfg, repo, token, old_workspace=None):
         prepare_workspace(repo, state['base_sha'], state['head_sha'], workspace, [])
     state['changed_paths'] = read(workspace/'input-manifest.json')['changed_paths']
     write(out/'state.json', state); write(out/'config.json', cfg)
+    if state['phase'] == 'fix' or state['terminal'] and state['status'] in {'verified', 'findings'}:
+        from .cases import propose_case
+        propose_case(state, workspace, out/'candidate')
     if os.environ.get('GITHUB_OUTPUT'):
         with open(os.environ['GITHUB_OUTPUT'], 'a') as handle:
             for key, value in {'role': state.get('next_role') or '', 'phase': state['phase'], 'head': state['head_sha'],
@@ -153,6 +156,9 @@ def ci_main(operation: str, artifact_name=None, destination=None) -> Json:
     cfg = validate_config(read(repo/'.review/config.json'))
     token = os.environ.get('GH_TOKEN', '')
     api = GitHub(token)
+    if operation.startswith("eval-"):
+        from .eval_runtime import ci_eval_main
+        return ci_eval_main(operation, repo, cfg, api)
     if operation == 'fetch-artifact':
         from .github import download_artifact
         name = f'{os.environ["GITHUB_RUN_ID"]}-{os.environ["GITHUB_RUN_ATTEMPT"]}-{artifact_name}'

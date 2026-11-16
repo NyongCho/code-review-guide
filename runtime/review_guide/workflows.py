@@ -120,4 +120,41 @@ def render_workflows(config: Json) -> dict[str, str]:
                                    'runs-on': 'ubuntu-24.04', 'environment': 'review-approval',
                                    'steps': [{'run': 'true'}]}}
     return {'.github/workflows/review-entry.yml': json.dumps(workflow, indent=2) + '\n',
-            '.github/workflows/review-approve.yml': json.dumps(approve, indent=2) + '\n'}
+            '.github/workflows/review-approve.yml': json.dumps(approve, indent=2) + '\n',
+            '.github/workflows/review-evaluate.yml': json.dumps(evaluation_workflow(cfg, jobs['api_0']['steps'][3]), indent=2) + '\n'}
+
+
+def evaluation_workflow(cfg: Json, model_step: Json) -> Json:
+    import copy
+    read = {'contents':'read','actions':'read'}
+    jobs = {'entry': {'runs-on':'ubuntu-24.04','timeout-minutes':5,'permissions':read,
+                      'outputs':{'mode':'${{ steps.control.outputs.mode }}'},
+                      'steps':[checkout(), command('eval-entry', {'GH_TOKEN':'${{ github.token }}'}, id='control'),
+                               upload('eval-input','out',cfg['retention_days'])]}}
+    for mode in ('self_hosted','api'):
+        steps = [checkout(), download('eval-input','input')]
+        if mode=='self_hosted':
+            steps.append(command('eval-self-hosted', {'CODEX_EXECUTABLE':'${{ vars.REVIEW_CODEX_EXECUTABLE }}'}))
+        else:
+            for role in ('bugs','security','verify'):
+                steps.append(command('eval-request', {'EVAL_ROLE':role}, id='prepare_'+role))
+                action = copy.deepcopy(model_step)
+                action['id'] = 'codex_'+role
+                action['timeout-minutes'] = action['timeout-minutes'].replace('steps.prepare.', 'steps.prepare_'+role+'.')
+                action['with'] = {key: value.replace('steps.prepare.', 'steps.prepare_'+role+'.') if isinstance(value,str) else value
+                                  for key,value in action['with'].items()}
+                action['with']['output-file'] = 'raw-'+role+'.json'
+                steps.append(action)
+                steps.append(command('eval-normalize', {'EVAL_ROLE':role,'ACTION_OUTCOME':'${{ steps.codex_'+role+'.outcome }}'},
+                                     **{'if':'${{ always() && !cancelled() }}'}))
+            steps.append(command('eval-record', **{'if':'${{ always() && !cancelled() }}'}))
+        steps.append(upload('eval-record-'+mode,'trial-record.json',cfg['retention_days']) | {'if':'${{ always() && !cancelled() }}'})
+        jobs[mode] = {'needs':['entry'], 'if':"${{ needs.entry.outputs.mode == '"+mode+"' }}",
+                      'runs-on':['self-hosted','linux','review-guide'] if mode=='self_hosted' else 'ubuntu-24.04',
+                      'environment':'review-runtime', 'timeout-minutes':max(5,(cfg['run_timeout_s']+59)//60),
+                      'permissions':read,'steps':steps}
+    return {'name':'Evaluate one frozen trial','permissions':{},
+            'on':{'workflow_dispatch':{'inputs':{name:{'required':True,'type':'string','description':description}
+                  for name,description in {'manifest':'Manifest path relative to .review/evals',
+                                           'case_id':'Confirmed case folder name', 'configuration':'Frozen configuration digest',
+                                           'trial':'Trial index from the expected manifest'}.items()}}}, 'jobs':jobs}
