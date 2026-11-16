@@ -5,7 +5,7 @@
 ## 한 번 설정하기
 
 1. [GitHub App 등록](https://github.com/settings/apps/new)에서 본인 계정용 App을 만든다. homepage는 프로젝트 URL, webhook은 비활성화한다. Repository permissions는 **Checks: Read and write**, **Contents: Read-only**, **Administration: Read-only**다. Metadata read는 기본 권한이다. 다른 계정에 설치할 필요는 없다.
-2. 해당 App을 검증할 저장소에만 설치한다. App ID를 기록하고 private key를 생성한다. 키는 채팅·저장소에 넣지 않는다.
+2. 해당 App을 검증할 저장소에만 설치한다. App ID를 기록한 뒤 [개인 계정의 GitHub Apps](https://github.com/settings/apps) → 해당 App의 **Edit → Credentials → Key pairs → New key**에서 `.pem` 파일을 내려받는다. 이것이 App의 private key다. 키는 채팅·저장소에 넣지 않는다. [현재 GitHub 안내](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/managing-private-keys-for-github-apps)
 3. GitHub Environment `review-publisher`를 만들고 deployment branch는 trusted branch(기본 main)만 허용한다. 그 환경의 variable `REVIEW_APP_ID`와 secret `REVIEW_APP_PRIVATE_KEY`를 등록한다. 모델의 `review-runtime` 환경과 분리한다.
 4. 프로젝트 `.review/config.json`에 숫자 `check_publisher_app_id`를 설정한다. 이 값과 환경의 App ID가 같아야 한다. 원격 보호 설정도 아래 계약으로 맞춘다.
 
