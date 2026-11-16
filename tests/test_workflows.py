@@ -51,6 +51,17 @@ class WorkflowTests(unittest.TestCase):
         self.assertNotIn('self-hosted', text)
         self.assertIn('unittest', text)
 
+    def test_official_action_owns_repo_flag_and_emits_usage_events(self):
+        cfg = sample_config('api') | {'api_budget': {'approved_usd': 5, 'max_calls': 3}}
+        for document in render_workflows(cfg).values():
+            for job in json.loads(document)['jobs'].values():
+                for step in job.get('steps', []):
+                    if step.get('uses', '').startswith('openai/codex-action@'):
+                        args = json.loads(step['with']['codex-args'])
+                        self.assertNotIn('--skip-git-repo-check', args,
+                                         'The pinned Action already supplies this non-repeatable CLI flag')
+                        self.assertIn('--json', args)
+
     def test_terminal_state_skips_the_unused_tail(self):
         jobs=self.workflow()['jobs']
         for i in range(15):
