@@ -2,6 +2,8 @@
 
 ChatGPT 구독과 API 과금은 별도다. API 프로젝트·모델 접근·검증 예산을 확인한 후 실행한다. key 값은 채팅이나 repo에 넣지 않는다.
 
+공개 저장소도 API mode로 실행할 수 있다. `allowed_actors`에 있는 사람의 같은 저장소 PR만 허용하며 fork PR·미허용 작성자는 모델 호출 전에 거절한다. 보호 환경과 trusted branch 제한은 공개 저장소에서도 필수다.
+
 1. 프로젝트 설정의 mode를 `api`로 명시하고 `api_budget.approved_usd`, `api_budget.max_calls`를 지정한다. 이는 승인된 예산과 호출 제한이며, 공급자 측 강제 비용 상한의 존재를 보장하지 않는다.
 2. 보호된 default branch만 접근 가능한 GitHub Environment `review-runtime`을 만든다. 키는 그 환경의 `OPENAI_API_KEY` secret으로 등록한다. feature/PR ref에서 접근이 거절되는지 합성 canary로 확인한다.
 3. 공식 `openai/codex-action`을 `13e9c17417b29e9a276f73ec6ed7fb574137d3c3`로 고정하고 CLI 버전·모델·추론 강도도 기록한다. `openai-api-key` 입력만 키를 받으며 저장소 코드 job의 공통 환경에 두지 않는다.

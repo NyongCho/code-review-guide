@@ -15,13 +15,13 @@
 
 ## 시작하기
 
-로컬 도구는 Python 3.11 이상과 Git을 사용하며 외부 Python 패키지가 필요 없다. v1 실행 대상은 private 저장소, 인수 샘플은 표준 라이브러리만 쓰는 Python 프로젝트다. 생성된 테스트 job은 고정한 Python Docker 이미지에서 네트워크·호스트 쓰기·권한 상승을 제한한다. 다른 언어/의존성 설치는 해당 테스트 이미지와 격리를 따로 검증해야 한다.
+로컬 도구는 Python 3.11 이상과 Git을 사용하며 외부 Python 패키지가 필요 없다. 구독 실행 대상은 private 저장소다. API는 public/private 모두에서 허용된 작성자의 같은 저장소 PR만 받으며 fork PR은 실행하지 않는다. 인수 샘플은 표준 라이브러리만 쓰는 Python 프로젝트다. 생성된 테스트 job은 고정한 Python Docker 이미지에서 네트워크·호스트 쓰기·권한 상승을 제한한다. 다른 언어/의존성 설치는 해당 테스트 이미지와 격리를 따로 검증해야 한다.
 
 [bootstrap 스킬](skills/review-bootstrap/SKILL.md)을 구축 에이전트에 제공하고, 다음 중 config 예시를 복사해 저장소·사용자·모델·테스트 명령을 맞춘다.
 
 | 실행 방식 | 설정 예시 | 설치 안내 |
 | --- | --- | --- |
-| 전용 서버의 Codex 구독 로그인 | [self-hosted.json](examples/config/self-hosted.json) | [서버 설정](docs/setup-self-hosted.md) |
+| 전용 서버의 제한된 SSH worker + Codex 구독 로그인 | [self-hosted.json](examples/config/self-hosted.json) | [서버 설정](docs/setup-self-hosted.md) |
 | GitHub-hosted 공식 Codex Action + API 키 | [api.json](examples/config/api.json) | [API 설정](docs/setup-api.md) |
 
 두 방식은 자동 전환하지 않는다. API 예시의 3회 제한은 bugs/security/verify 한 묶음이며 자동 수정까지 하려면 검증 예산 안에서 호출 수를 별도로 정해야 한다. `approved_usd`는 승인한 예산 기록이며 달러 단위 강제 차단기가 아니다. API 모델 접근성은 실제 계정에서 확인한다.

@@ -249,6 +249,10 @@ def ci_main(operation: str, artifact_name=None, destination=None) -> Json:
         request = build_request(state['next_role'], state, Path(context['workspace']), effective)
         result = run_codex(request, Path(os.environ['CODEX_EXECUTABLE']), request['timeout_s'])
         write('model-result.json', result); return {'status': result['status']}
+    if operation == 'ssh-worker':
+        from .ssh_worker import run_remote, connection_from_environment
+        result = run_remote(state, cfg, Path('input/workspace'), connection_from_environment())
+        write('model-result.json', result); return {'status': result['status']}
     if operation == 'normalize-worker':
         raw = Path('raw-result.json').read_text() if Path('raw-result.json').is_file() else ''
         result = normalize_action(raw, os.environ['ACTION_OUTCOME'])

@@ -40,14 +40,27 @@ def main(argv: list[str] | None = None) -> int:
     for name in ("config", "state", "event", "output"):
         transition.add_argument("--" + name, type=Path, required=True)
     ci = sub.add_parser("ci", help="protected workflow controller; not a worker API")
-    ci.add_argument("operation", choices=["entry", "tests", "inspect", "prepare-worker", "worker", "normalize-worker", "collect", "finish", "approval", "fetch-artifact", "eval-entry", "eval-self-hosted", "eval-request", "eval-normalize", "eval-record"])
+    ci.add_argument("operation", choices=["entry", "tests", "inspect", "prepare-worker", "worker", "ssh-worker", "normalize-worker", "collect", "finish", "approval", "fetch-artifact", "eval-entry", "eval-self-hosted", "eval-request", "eval-normalize", "eval-record"])
     ci.add_argument("--name")
     ci.add_argument("--destination", type=Path)
+    serve = sub.add_parser("serve", help="restricted SSH forced-command worker")
+    serve.add_argument("--server-config", type=Path, required=True)
     from .knowledge_cli import register, execute
     register(sub)
     args = parser.parse_args(argv)
     try:
-        if args.command in {"case", "eval"}:
+        if args.command == "serve":
+            import os
+            import signal
+            from .ssh_worker import serve_request, MAX_ARCHIVE
+            from .contracts import require
+            require(not os.environ.get('SSH_ORIGINAL_COMMAND'), 'SSH commands are not accepted')
+            def interrupted(signum, frame):
+                raise InterruptedError('worker connection interrupted')
+            for sig in (signal.SIGTERM, signal.SIGHUP):
+                signal.signal(sig, interrupted)
+            result = serve_request(sys.stdin.buffer.read(MAX_ARCHIVE+1), json.loads(args.server_config.read_text()))
+        elif args.command in {"case", "eval"}:
             result = execute(args)
         elif args.command == "validate":
             result = validate_config(json.loads(args.config.read_text()))

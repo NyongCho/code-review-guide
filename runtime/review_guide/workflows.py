@@ -13,6 +13,11 @@ CLI = 'python3 trusted/.review/bin/reviewctl.py ci '
 PREFIX = '${{ github.run_id }}-${{ github.run_attempt }}-'
 
 
+def ssh_environment():
+    return {'REVIEW_SSH_KEY':'${{ secrets.REVIEW_SSH_KEY }}',
+            **{key:'${{ vars.'+key+' }}' for key in ('REVIEW_SSH_HOST','REVIEW_SSH_USER','REVIEW_SSH_PORT','REVIEW_SSH_KNOWN_HOSTS')}}
+
+
 def selected_result(mode: str, outcomes: Json, result: Json | None) -> Json:
     if outcomes.get(mode) != 'success':
         return _failure('incomplete', 'selected model job did not succeed')
@@ -70,7 +75,7 @@ def render_workflows(config: Json) -> dict[str, str]:
             condition = '${{ !cancelled() && needs.' + inspect + ".outputs.mode == '" + mode + "' && needs." + inspect + ".outputs.role != '' }}"
             steps = [checkout(), download(inspect, 'input'), command('prepare-worker')]
             if mode == 'self_hosted':
-                steps.append(command('worker', {'CODEX_EXECUTABLE': '${{ vars.REVIEW_CODEX_EXECUTABLE }}'}))
+                steps[2] = command('ssh-worker', ssh_environment())
             else:
                 steps.extend([{'name': 'Call Codex', 'id': 'codex', 'uses': CODEX_ACTION,
                                'timeout-minutes': '${{ fromJSON(steps.prepare.outputs.timeout_minutes) }}',
@@ -86,7 +91,7 @@ def render_workflows(config: Json) -> dict[str, str]:
                               command('normalize-worker', {'ACTION_OUTCOME': '${{ steps.codex.outcome }}'}, **{'if': '${{ always() && !cancelled() }}'})])
             steps[2]['id'] = 'prepare'
             steps.append(upload(name, 'model-result.json', days))
-            jobs[name] = {'needs': [inspect], 'if': condition, 'runs-on': ['self-hosted', 'linux', 'review-guide'] if mode == 'self_hosted' else 'ubuntu-24.04',
+            jobs[name] = {'needs': [inspect], 'if': condition, 'runs-on': 'ubuntu-24.04',
                           'environment': 'review-runtime', 'timeout-minutes': max(2, (cfg['model_timeout_s'] + 59)//60 + 2),
                           'permissions': read, 'steps': steps}
         steps = [checkout(), download(inspect, 'input')]
@@ -134,7 +139,7 @@ def evaluation_workflow(cfg: Json, model_step: Json) -> Json:
     for mode in ('self_hosted','api'):
         steps = [checkout(), download('eval-input','input')]
         if mode=='self_hosted':
-            steps.append(command('eval-self-hosted', {'CODEX_EXECUTABLE':'${{ vars.REVIEW_CODEX_EXECUTABLE }}'}))
+            steps.append(command('eval-self-hosted', ssh_environment()))
         else:
             for role in ('bugs','security','verify'):
                 steps.append(command('eval-request', {'EVAL_ROLE':role}, id='prepare_'+role))
@@ -150,7 +155,7 @@ def evaluation_workflow(cfg: Json, model_step: Json) -> Json:
             steps.append(command('eval-record', **{'if':'${{ always() && !cancelled() }}'}))
         steps.append(upload('eval-record-'+mode,'trial-record.json',cfg['retention_days']) | {'if':'${{ always() && !cancelled() }}'})
         jobs[mode] = {'needs':['entry'], 'if':"${{ needs.entry.outputs.mode == '"+mode+"' }}",
-                      'runs-on':['self-hosted','linux','review-guide'] if mode=='self_hosted' else 'ubuntu-24.04',
+                      'runs-on':'ubuntu-24.04',
                       'environment':'review-runtime', 'timeout-minutes':max(5,(cfg['run_timeout_s']+59)//60),
                       'permissions':read,'steps':steps}
     return {'name':'Evaluate one frozen trial','permissions':{},

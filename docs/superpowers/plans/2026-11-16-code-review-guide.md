@@ -1,5 +1,7 @@
 # Code Review Guide Implementation Plan
 
+> 구현 중 승인된 변경(2026-11-16): 사용자가 private 보호 기능의 Pro 제한 대신 공개 샘플 테스트를 선택했다. API만 public same-repo/허용 작성자로 확장하고 구독은 private를 유지한다. 서버 연결은 인증된 Actions runner 대신 보호 환경의 제한된 SSH worker로 구현한다. 아래 초기 설계/계획은 이 변경과 함께 읽으며 최신 증거는 [검증 상태](../../validation.md)를 따른다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 프로젝트에 독립적으로 설치되고 경험을 축적하는 AI 리뷰 체계를 만들며, private Python 샘플의 실제 PR에서 self-hosted 구독 방식과 GitHub-hosted API 방식을 각각 검증한다.

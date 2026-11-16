@@ -31,3 +31,5 @@ def output(findings=None):
     return {"status": "findings" if findings else "verified", "findings": findings,
             "summary": "Checked the change", "risk": "medium", "patch": "",
             "dispositions": []}
+
+FAKE_CODEX_HEADER = "#!/usr/bin/env python3\nimport sys\nif '--version' in sys.argv:\n print('codex-cli 0.169.0');sys.exit(0)\n"

@@ -67,6 +67,16 @@ def build_request(role: str, run: Json, workspace: Path, config: Json) -> Json:
     isolation = cfg["isolation"]
     require(isolation.get("status") == "verified", "runtime isolation needs verification")
     home = Path(isolation["codex_home"]).resolve()
+    for name in ("AGENTS.md", "AGENTS.override.md", "hooks.json", "instructions.md"):
+        require(not (home / name).exists(), "dedicated Codex home contains foreign instructions or hooks")
+    for name in ("memories", "rules", "prompts"):
+        require(not (home / name).exists() or not any((home / name).iterdir()),
+                "dedicated Codex home contains personal resources")
+    skills = home / "skills"
+    if skills.exists():
+        # The pinned CLI installs its bundled .system skills automatically.
+        require(all(path.name == ".system" and not path.is_symlink() for path in skills.iterdir()),
+                "dedicated Codex home contains personal skills")
     policy = home / "config.toml"
     report_path = Path(isolation["report_path"]).resolve()
     workspace = Path(workspace).resolve()
@@ -78,6 +88,7 @@ def build_request(role: str, run: Json, workspace: Path, config: Json) -> Json:
     require("sandbox_mode" not in settings and "sandbox_workspace_write" not in settings,
             "legacy sandbox conflicts with permission profile")
     require(settings.get("default_permissions") == "review", "dedicated review profile required")
+    require(settings.get("project_doc_max_bytes") == 0, "automatic project instruction discovery must be disabled")
     require(not settings.get("mcp_servers") and settings.get("web_search") == "disabled",
             "external retrieval must be disabled")
     checks = {"secret_read_denied", "network_denied", "instructions_inert", "privilege_escalation_denied"}
@@ -118,9 +129,21 @@ def run_codex(request: Json, executable: Path, timeout_s: int) -> Json:
     require(request.get("gate", {}).get("verified") is True, "runtime isolation needs verification")
     require(request.get("mode") == "self_hosted", "API requests must use the official Codex Action")
     require(timeout_s > 0, "execution budget exhausted")
-    env = {key: value for key, value in os.environ.items() if key in {"PATH", "HOME", "LANG", "LC_ALL", "TMPDIR"}}
+    env = {key: value for key, value in os.environ.items() if key in {"LANG", "LC_ALL", "TMPDIR"}}
+    env["PATH"] = "/usr/local/bin:/usr/bin:/bin"
+    env["HOME"] = request["codex_home"]
     env["CODEX_HOME"] = request["codex_home"]
     start = time.monotonic()
+    require(isinstance(request.get("codex_version"), str), "pinned Codex version required")
+    try:
+        version = subprocess.run([str(executable), "--version"], env=env, capture_output=True,
+                                 text=True, timeout=min(5, timeout_s))
+    except subprocess.TimeoutExpired:
+        return _failure("incomplete", "Codex version probe timed out")
+    except OSError:
+        return _failure("failed", "Codex executable could not be started")
+    if version.returncode or version.stdout.strip() != "codex-cli " + request["codex_version"]:
+        return _failure("failed", "actual Codex version differs from verified runtime")
     with tempfile.TemporaryFile() as stdout, tempfile.TemporaryFile() as stderr:
         try:
             process = subprocess.Popen([str(executable), *request["argv"]], cwd=request["cwd"], env=env,
@@ -129,19 +152,31 @@ def run_codex(request: Json, executable: Path, timeout_s: int) -> Json:
             return _failure("failed", "Codex executable could not be started")
         payload = request["prompt"].encode()
         timed_out, oversized = False, False
-        while True:
-            remaining = timeout_s - (time.monotonic() - start)
-            oversized = os.fstat(stdout.fileno()).st_size + os.fstat(stderr.fileno()).st_size > MAX_OUTPUT
-            if remaining <= 0 or oversized:
-                timed_out = not oversized
-                os.killpg(process.pid, signal.SIGKILL)
+        try:
+            while True:
+                remaining = timeout_s - (time.monotonic() - start)
+                oversized = os.fstat(stdout.fileno()).st_size + os.fstat(stderr.fileno()).st_size > MAX_OUTPUT
+                if remaining <= 0 or oversized:
+                    timed_out = not oversized
+                    try:
+                        os.killpg(process.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                    process.communicate()
+                    break
+                try:
+                    process.communicate(payload, timeout=min(0.1, remaining))
+                    break
+                except subprocess.TimeoutExpired:
+                    payload = None
+        finally:
+            if process.poll() is None:
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
                 process.communicate()
-                break
-            try:
-                process.communicate(payload, timeout=min(0.1, remaining))
-                break
-            except subprocess.TimeoutExpired:
-                payload = None
+        oversized = oversized or os.fstat(stdout.fileno()).st_size + os.fstat(stderr.fileno()).st_size > MAX_OUTPUT
         stdout.seek(0)
         raw = stdout.read(MAX_OUTPUT + 1).decode("utf-8", errors="replace")
     if oversized:

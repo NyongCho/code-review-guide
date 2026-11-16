@@ -1,3 +1,4 @@
+from tests.fixtures import FAKE_CODEX_HEADER
 import json
 import shutil
 import subprocess
@@ -96,7 +97,7 @@ class InstallTests(unittest.TestCase):
         config.write_text(json.dumps(cfg))
         (root / "run.json").write_text(json.dumps(run))
         fake = root / "codex"
-        fake.write_text("#!/usr/bin/env python3\nprint(" + repr(events()) + ")\n")
+        fake.write_text(FAKE_CODEX_HEADER + "print(" + repr(events()) + ")\n")
         fake.chmod(0o755)
         result = subprocess.run(["python3", str(self.target / ".review/bin/reviewctl.py"), "run-codex",
                                  "--config", str(config), "--run", str(root / "run.json"),

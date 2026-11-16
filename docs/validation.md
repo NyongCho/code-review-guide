@@ -10,8 +10,10 @@
 | 합성 Python 인수 | 두 mode 모의 통과 | 실제 Git·Python 테스트 + 가짜 모델/GitHub, 설치→버그→수정·회귀 테스트→새 head 재리뷰→사례→교체 보류 |
 | 평가 정답·판정 | 로컬 통과 | 입력 snapshot 검증, 후보만 자동 생성, 별도 운영자 확정, 서명 변조 거절, 고정 분모·중요 누락 보류 |
 | Codex 구독 smoke | 제한적 실제 성공 | 전용 임시 0.169.0/gpt-6-astra 호출만 확인. 전체 리뷰/서버 운영 증거가 아님 |
-| Codex 파일 권한 canary | 제한적 로컬 성공 | 0.169.0에서 입력 읽기, 외부 파일 읽기 거절, 쓰기 거절. 네트워크/권한 상승/지침 로딩과 실제 서버는 별도 검증 필요 |
-| 전용 self-hosted runner 진입 제한 | needs_verification | 보호된 workflow/ref 밖에서 인증 runner를 호출하지 못하는지 확인 필요 |
+| Codex 파일 권한 canary | 제한적 로컬 성공 | 0.169.0에서 파일·네트워크·권한 상승 거절. 전역 AGENTS 로딩 위험을 발견하여 실행 전 거절. 실제 서버는 bubblewrap 부재로 실패 |
+| 제한된 SSH worker | 로컬 통과 / 실제 서버 needs_verification | 서버 소유 경로·allowlist·버전·deadline·zip 거절, forced-command CLI와 가짜 SSH 종단간 검사. 실제 전용 계정·bubblewrap·키 연결 필요 |
+| GitHub 보호 환경 | 합성 원격 통과 | main dispatch 성공, PR의 기존·신규 workflow 거절. 실제 key는 미등록 |
+| Branch protection | 공개 샘플 설정 완료 | private는 Pro 요구403. 사용자 요청으로 합성 샘플을 공개 전환; 필수 ci와 관리자 적용 설정 확인. 실제 머지 거절은 별도 확인 필요 |
 | API 실제 모델 호출 | needs_verification | 전체 검증 예산 US$5 승인. 키 연결 및 호출 전; 사용 비용 0 |
 | 정상/버그/민감 실제 PR | needs_verification | 별도 private 샘플의 원격 PR/head/run/check 증거 필요 |
 | 실제 반복 평가·사람 정답 | needs_verification | 합성 판정 fixture를 실제 사용자의 정답 승인으로 취급하지 않음 |
@@ -29,6 +31,27 @@ python3 scripts/check_workflows.py
 
 ## 실제 운영 인수에서 남길 증거
 
-각 mode마다 pinned CLI/Action/모델/effort, runtime profile hash, runner/ref 제한, 테스트 컨테이너 canary, PR 번호·base/head·input digest, 테스트/리뷰/check/수정 commit, 실패와 복구 결과를 private 샘플에 기록한다. 공개 guide에는 호스트 주소·개인 경로·키·private 코드·원본 로그를 제외한 결과만 남긴다.
+각 mode마다 pinned CLI/Action/모델/effort, runtime profile hash, 보호 환경/ref 제한, 테스트 컨테이너 canary, PR 번호·base/head·input digest, 테스트/리뷰/check/수정 commit, 실패와 복구 결과를 private 샘플에 기록한다. 공개 guide에는 호스트 주소·개인 경로·키·private 코드·원본 로그를 제외한 결과만 남긴다.
 
-설계 §10의 완료 조건과 실제 경로별 결과 매핑은 서버/API 인수 후 갱신한다. 한 경로만 검증되었다면 다른 경로를 지원 완료로 표시하지 않는다.
+## 설계 §10 완료 조건 매핑
+
+아래의 모의 통과는 두 mode를 대상으로 한 로컬 증거다. 실제 모델을 포함하는 인수는 아직 완료되지 않았다.
+
+| 조건 | 도구/로컬 증거 | 구독 실제 인수 | API 실제 인수 |
+| --- | --- | --- | --- |
+| 1 설치·사용자 편집 보존 | install 테스트·스킬 행동 검사 통과 | pending | pending |
+| 2 정상 PR·오탐 | acceptance 모의 통과 | pending | pending |
+| 3 버그 지적·별도 검증 | acceptance 모의 통과 | pending | pending |
+| 4 수정·회귀 검사·재리뷰 | 실제 Git/Python + 모의 모델 통과 | pending | pending |
+| 5 민감 변경 사람 확인 | policy/lifecycle 테스트 통과 | pending | pending |
+| 6 중복·stale·상한·실패 | lifecycle/GitHub/adapter 테스트 통과 | pending | pending |
+| 7 후보·사람 정답 | 후보와 서명 경계 통과, 실제 정답 미확정 | pending | pending |
+| 8 동일 문제집·중요 퇴행 보류 | evaluate/eval_runtime 모의 통과 | pending | pending |
+| 9 수정 후 명시적 CI | 생성 DAG + acceptance 모의 통과 | pending | pending |
+| 10 설치·운영 안내 | 두 mode와 SSH 예시 작성 | 서버 선행 조건 미충족 | 키·격리 인수 전 |
+| 11 계약·개선 자료 보존 | 공통 실행기·3-way 설치 통과 | pending | pending |
+| 12 과금 fallback 금지 | adapter 실패/모드 검사 통과 | pending | pending |
+
+공개 API 샘플은 [code-review-guide-sample](https://github.com/NyongCho/code-review-guide-sample)이다. 구독 경로는 공개 저장소에서 실행하지 않는다. 환경의 [main 성공](https://github.com/NyongCho/code-review-guide-sample/actions/runs/43818243935)과 [새 PR workflow 차단](https://github.com/NyongCho/code-review-guide-sample/actions/runs/43818354472)은 합성 canary이며 실제 모델 품질·키 격리의 증거가 아니다. 차단 annotation은 `refs/pull/1/merge`가 review-runtime 배포 규칙에 허용되지 않음을 명시한다.
+
+한 경로만 검증되었다면 다른 경로를 지원 완료로 표시하지 않는다.

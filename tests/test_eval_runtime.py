@@ -1,3 +1,4 @@
+from tests.fixtures import FAKE_CODEX_HEADER
 import copy
 import json
 import tempfile
@@ -17,7 +18,7 @@ class EvalRuntimeTests(unittest.TestCase):
             cfg['tools_digest']=describe_tools(Path(cfg['isolation']['codex_home'])/'config.toml')
             bundle={'run':run,'config':cfg,'trial':{'case_id':'sample'},'stages':{},'requests':{}}
             executable=root/'codex'
-            executable.write_text('#!/usr/bin/env python3\nprint('+repr(test_codex.events())+')\n'); executable.chmod(0o755)
+            executable.write_text(FAKE_CODEX_HEADER + 'print('+repr(test_codex.events())+')\n'); executable.chmod(0o755)
             result=run_trial(bundle,workspace,executable)
             self.assertEqual(result['status'],'complete')
             self.assertEqual(set(result['stages']),{'bugs','security','verify'})

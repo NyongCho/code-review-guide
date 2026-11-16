@@ -75,7 +75,8 @@ def verify_entry(pr: Json, config: Json, trusted_ref: str) -> None:
     cfg = validate_config(config)
     require(trusted_ref == cfg['trusted_ref'], 'entry must run on protected trusted ref')
     require(pr['state'] == 'open', 'PR is not open')
-    require(pr['base']['repo']['private'] is True, 'v1 model execution requires a private target')
+    require(cfg['mode'] == 'api' or pr['base']['repo']['private'] is True,
+            'subscription model execution requires a private target')
     require(pr['base']['repo']['full_name'] == pr['head']['repo']['full_name'] == cfg['repository'], 'fork or repository mismatch')
     require('refs/heads/' + pr['base']['ref'] == cfg['trusted_ref'], 'unexpected base branch')
     require(pr['user']['type'] == 'User' and pr['user']['login'] in cfg['allowed_actors'], 'author not allowed')

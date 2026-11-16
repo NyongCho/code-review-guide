@@ -2,6 +2,7 @@
 
 Operator decisions and isolation reports below are fixtures, not deployment evidence.
 """
+from tests.fixtures import FAKE_CODEX_HEADER
 import base64
 import copy
 import hashlib
@@ -111,7 +112,7 @@ class AcceptanceTests(unittest.TestCase):
                     request=build_request(state['next_role'],state,workspace,cfg)
                     if mode=='api': return normalize_action(json.dumps(value),'success')
                     executable=root/'fake-codex'
-                    executable.write_text('#!/usr/bin/env python3\nprint('+repr(test_codex.events(value))+')\n'); executable.chmod(0o755)
+                    executable.write_text(FAKE_CODEX_HEADER + 'print('+repr(test_codex.events(value))+')\n'); executable.chmod(0o755)
                     return run_codex(request,executable,request['timeout_s'])
                 outcomes={mode:'success',('api' if mode=='self_hosted' else 'self_hosted'):'skipped'}
                 for value in (output([issue]),output(),output([issue])|{'dispositions':[{'id':issue['id'],'decision':'confirmed','reason':'set removes distinct line items'}]}):

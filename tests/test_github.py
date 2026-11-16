@@ -68,6 +68,15 @@ class GitHubTests(unittest.TestCase):
         self.fake.pr['head']['repo']['full_name'] = 'fork/project'
         with self.assertRaises(ValidationError): verify_entry(self.fake.pr, cfg, 'refs/heads/main')
 
+    def test_public_api_requires_same_repo_and_allowed_human(self):
+        cfg = sample_config() | {'mode':'api', 'api_budget':{'approved_usd':5,'max_calls':3}, 'allowed_actors':['owner']}
+        current=pr();current['base']['repo']['private']=False
+        verify_entry(current,cfg,'refs/heads/main')
+        current['user']['login']='stranger'
+        with self.assertRaises(ValidationError):verify_entry(current,cfg,'refs/heads/main')
+        current['user']['login']='owner';current['head']['repo']['full_name']='fork/project'
+        with self.assertRaises(ValidationError):verify_entry(current,cfg,'refs/heads/main')
+
     def test_stale_head_base_and_intent(self):
         for field, value, reason in [('head', '0'*40, 'stale_head'), ('base', '0'*40, 'stale_input')]:
             current = pr(); current[field]['sha'] = value

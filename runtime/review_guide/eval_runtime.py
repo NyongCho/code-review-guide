@@ -110,7 +110,15 @@ def ci_eval_main(operation, repo, cfg, api):
         return {'status':'prepared'}
     bundle = read('input/trial.json')
     if operation=='eval-self-hosted':
-        result = run_trial(bundle,Path('input/workspace'),Path(os.environ['CODEX_EXECUTABLE']))
+        from .ssh_worker import run_remote, connection_from_environment
+        for role in ROLES:
+            run = copy.deepcopy(bundle['run']); run['role'] = role
+            run['candidates'] = {stage:r['findings'] for stage,r in bundle['stages'].items()}
+            result = run_remote(run,bundle['config'],Path('input/workspace'),connection_from_environment())
+            bundle['stages'][role] = result
+            bundle['requests'][role] = result.get('request_evidence', {})
+            if result['status'] not in {'verified','findings'}: break
+        result = trial_record(bundle)
         write('trial-record.json',result); return {'status':result['status']}
     role = os.environ.get('EVAL_ROLE')
     if operation=='eval-request':

@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "allowed_repositories": ["OWNER/PRIVATE_PROJECT"],
+  "allowed_models": ["gpt-6-astra"],
+  "allowed_efforts": ["low"],
+  "codex_version": "0.169.0",
+  "codex_executable": "/opt/review-guide/codex/0.169.0/codex",
+  "codex_home": "/var/lib/review-worker/codex-home",
+  "report_path": "/etc/review-guide/isolation.json",
+  "work_root": "/var/lib/review-worker/work",
+  "max_timeout_s": 600
+}
