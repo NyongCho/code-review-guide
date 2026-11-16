@@ -85,6 +85,26 @@ class InstallTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue((self.target / ".review/schemas/model-output.schema.json").is_file())
 
+    def test_installed_request_and_fake_model_need_no_source_bundle(self):
+        from tests.test_codex import CodexTests, events
+        self.install()
+        root = Path(self.temp.name)
+        workspace, cfg, run = CodexTests().runtime_fixture(root)
+        shutil.rmtree(workspace / "policy/.review")
+        shutil.copytree(self.target / ".review", workspace / "policy/.review")
+        config = root / "runtime.json"
+        config.write_text(json.dumps(cfg))
+        (root / "run.json").write_text(json.dumps(run))
+        fake = root / "codex"
+        fake.write_text("#!/usr/bin/env python3\nprint(" + repr(events()) + ")\n")
+        fake.chmod(0o755)
+        result = subprocess.run(["python3", str(self.target / ".review/bin/reviewctl.py"), "run-codex",
+                                 "--config", str(config), "--run", str(root / "run.json"),
+                                 "--workspace", str(workspace), "--output", str(root / "result.json"),
+                                 "--executable", str(fake)], cwd=root, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads((root / "result.json").read_text())["status"], "verified")
+
     def test_empty_project_remains_unverified(self):
         result = self.install()
         layers = json.loads((self.target / ".review/layers.json").read_text())

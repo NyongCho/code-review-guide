@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .contracts import ValidationError, validate_config
 from .install import apply_install, plan_install
+from .codex import build_request, normalize_action, normalize_result, run_codex
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -21,6 +22,19 @@ def main(argv: list[str] | None = None) -> int:
     mode = install.add_mutually_exclusive_group(required=True)
     mode.add_argument("--dry-run", action="store_true")
     mode.add_argument("--apply", action="store_true")
+    for command in ("request", "run-codex"):
+        worker = sub.add_parser(command, help="prepare a gated model request" if command == "request" else "execute the subscription runtime")
+        worker.add_argument("--config", type=Path, required=True)
+        worker.add_argument("--run", type=Path, required=True)
+        worker.add_argument("--workspace", type=Path, required=True)
+        worker.add_argument("--output", type=Path, required=True)
+        if command == "run-codex":
+            worker.add_argument("--executable", type=Path, required=True)
+    normalize = sub.add_parser("normalize", help="normalize a Codex JSONL or Action result")
+    normalize.add_argument("--raw", type=Path, required=True)
+    normalize.add_argument("--output", type=Path, required=True)
+    normalize.add_argument("--action-outcome", choices=["success", "failure", "cancelled", "skipped"])
+    normalize.add_argument("--exit-code", type=int, default=0)
     args = parser.parse_args(argv)
     try:
         if args.command == "validate":
@@ -28,6 +42,23 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "install":
             proposal = plan_install(args.target, args.bundle, json.loads(args.config.read_text()))
             result = apply_install(args.target, proposal) if args.apply else proposal
+        elif args.command in {"request", "run-codex"}:
+            cfg, run = json.loads(args.config.read_text()), json.loads(args.run.read_text())
+            request = build_request(run["role"], run, args.workspace, cfg)
+            if args.command == "request":
+                args.output.mkdir(parents=True, exist_ok=True)
+                (args.output / "prompt.md").write_text(request["prompt"])
+                public = {key: value for key, value in request.items() if key not in {"gate", "prompt", "argv"}}
+                (args.output / "request.json").write_text(json.dumps(public, ensure_ascii=False, indent=2) + "\n")
+                result = {"status": "prepared", "prompt_file": str(args.output / "prompt.md"), **public}
+            else:
+                result = run_codex(request, args.executable, request["timeout_s"])
+                args.output.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n")
+        elif args.command == "normalize":
+            raw = args.raw.read_text() if args.raw.is_file() else ""
+            result = (normalize_action(raw, args.action_outcome) if args.action_outcome
+                      else normalize_result(raw, args.exit_code, False))
+            args.output.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n")
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
     except (ValidationError, OSError, json.JSONDecodeError) as exc:
