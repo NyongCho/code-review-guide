@@ -139,6 +139,12 @@ class InstallTests(unittest.TestCase):
             apply_install(self.target, proposal)
         self.assertEqual((self.target / "REVIEW.md").read_text(), "edited since proposal")
 
-
-if __name__ == "__main__":
-    unittest.main()
+    def test_preserved_local_model_setting_is_used_by_generated_action(self):
+        self.install()
+        path = self.target / '.review/config.json'
+        cfg = json.loads(path.read_text()); cfg['model'] = 'local-reviewed-model'
+        path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2) + '\n')
+        self.install()
+        workflow = json.loads((self.target/'.github/workflows/review-entry.yml').read_text())
+        model = next(step for step in workflow['jobs']['api_0']['steps'] if step.get('id') == 'codex')
+        self.assertEqual(model['with']['model'], '${{ steps.prepare.outputs.model }}')

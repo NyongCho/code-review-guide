@@ -70,6 +70,7 @@ def prepare_workspace(repo: Path, base: str, head: str, dest: Path, excluded: li
     dest.mkdir(exist_ok=True)
     (dest / "change.diff").write_bytes(diff)
     manifest = {"base_sha": base, "head_sha": head, "inert_files": inert,
+                "changed_paths": [p.decode() for p in _git(repo, "diff", "--name-only", "-z", base, head).split(b"\x00") if p],
                 "files": {name: hashlib.sha256(data).hexdigest() for name, data in selected.items()},
                 "rules": {name: hashlib.sha256(data).hexdigest() for name, data in trusted.items()},
                 "diff_digest": hashlib.sha256(diff).hexdigest()}

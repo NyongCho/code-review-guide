@@ -131,3 +131,17 @@ class LifecycleTests(unittest.TestCase):
         self.state = initial_state(sample_run() | {"mode": "api", "auth_kind": "api_key"}, cfg)
         self.event("model_result", role="bugs", result=output())
         self.assertEqual(self.state["reason"], "model call budget exhausted")
+
+    def test_security_review_cannot_lower_prior_high_risk(self):
+        self.event('model_result', role='bugs', result=output() | {'risk':'high'})
+        self.event('model_result', role='security', result=output() | {'risk':'low'})
+        self.assertEqual(self.state['risk'], 'high')
+
+    def test_duplicate_verifier_dispositions_do_not_silently_close_finding(self):
+        self.event('model_result', role='bugs', result=output([finding()]))
+        self.event('model_result', role='security', result=output())
+        self.event('model_result', role='verify', result=output() | {'dispositions': [
+            {'id': finding()['id'], 'decision':'confirmed', 'reason':'reproduced'},
+            {'id': finding()['id'], 'decision':'dismissed', 'reason':'ignore'}]})
+        self.assertTrue(self.state['terminal'])
+        self.assertNotEqual(self.state['status'], 'verified')

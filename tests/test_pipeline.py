@@ -1,0 +1,86 @@
+import copy
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+from runtime.review_guide.pipeline import inspect_state, test_command, collect_state
+from runtime.review_guide.lifecycle import initial_state
+from tests.fixtures import sample_config, sample_run, output
+from tests.test_github import Fake, pr
+from runtime.review_guide.github import GitHub, input_digest
+
+class PipelineTests(unittest.TestCase):
+    def setUp(self):
+        self.cfg = sample_config()
+        self.fake = Fake()
+        self.api = GitHub('unused', self.fake)
+        self.state = initial_state(sample_run() | {'input_digest': input_digest(pr())}, self.cfg)
+
+    def test_unverified_entry_isolation_blocks_all_model_calls_but_preserves_ci(self):
+        state = inspect_state(self.state, self.cfg, {'status': 'passed', 'head_sha': self.state['head_sha']}, self.api)
+        self.assertTrue(state['terminal'])
+        self.assertEqual(state['status'], 'incomplete')
+        self.assertEqual(state['ci_status'], 'passed')
+        self.assertIsNone(state['next_role'])
+
+    def test_test_failure_or_wrong_head_cannot_become_success(self):
+        for result in ({'status':'failed','head_sha':self.state['head_sha']},
+                       {'status':'passed','head_sha':'0'*40}, None):
+            state = inspect_state(self.state, self.cfg, result, self.api)
+            self.assertNotEqual(state['ci_status'], 'passed')
+            self.assertTrue(state['terminal'])
+
+    def test_tests_have_no_network_secrets_host_write_or_privilege(self):
+        command = test_command(Path('/tmp/input'), ['python3', '-m', 'unittest'], 'container-name')
+        joined = ' '.join(command)
+        for expected in ('--network=none','--read-only','--cap-drop=ALL','no-new-privileges','readonly','65534:65534'):
+            self.assertIn(expected, joined)
+        self.assertNotIn('GH_TOKEN', joined)
+        self.assertNotIn('OPENAI_API_KEY', joined)
+
+    def test_selected_failed_branch_stops_pipeline(self):
+        state = collect_state(self.state, self.cfg, {'self_hosted':'failure','api':'skipped'}, output(), self.api, Path('/unused'))
+        self.assertTrue(state['terminal'])
+        self.assertEqual(state['status'], 'incomplete')
+
+    def test_entry_through_collect_uses_installed_cli_and_real_git_snapshot(self):
+        import json, os, shutil
+        from runtime.review_guide.pipeline import ci_main
+        from runtime.review_guide.install import plan_install, apply_install
+        from tests.fixtures import ROOT
+        from tests.git_fixture import init_repo, commit_files
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); trusted = root/'trusted'; init_repo(trusted)
+            cfg = sample_config() | {'allowed_actors': ['owner']}
+            apply_install(trusted, plan_install(trusted, ROOT, cfg))
+            head = commit_files(trusted, {'src/total.py': 'def total(items): return sum(items)\n'})
+            self.fake.pr['base']['sha'] = self.fake.pr['head']['sha'] = head
+            env = {'GITHUB_EVENT_PATH': str(root/'event.json'), 'GITHUB_REF': 'refs/heads/main',
+                   'GITHUB_WORKFLOW_SHA': head, 'GITHUB_RUN_ID': '42', 'GITHUB_RUN_ATTEMPT': '1',
+                   'GITHUB_OUTPUT': str(root/'outputs'), 'TEST_OUTCOME': 'success',
+                   'SELF_HOSTED_OUTCOME': 'skipped', 'API_OUTCOME': 'skipped'}
+            (root/'event.json').write_text('{"number":1}')
+            original = self.fake.__call__
+            def transport(method, path, data=None):
+                if path.endswith('/actions/runs/42'):
+                    from runtime.review_guide.pipeline import now
+                    return {'created_at': now()}
+                return original(method, path, data)
+            cwd = Path.cwd()
+            try:
+                os.chdir(root)
+                with patch.dict(os.environ, env), patch('runtime.review_guide.pipeline.GitHub', return_value=GitHub('unused', transport)), patch('runtime.review_guide.pipeline.fetch'):
+                    ci_main('entry')
+                    shutil.move('out', 'input')
+                    Path('test-output').mkdir()
+                    Path('test-output/test-result.json').write_text(json.dumps({'status':'passed','head_sha':head}))
+                    ci_main('inspect')
+                    state = json.loads(Path('out/state.json').read_text())
+                    self.assertTrue(state['terminal'])
+                    self.assertEqual(state['ci_status'], 'passed')
+                    self.assertEqual(state['calls'], 0)
+                    shutil.rmtree('input'); shutil.move('out', 'input')
+                    ci_main('collect')
+                    self.assertEqual(json.loads(Path('out/state.json').read_text())['calls'], 0)
+            finally:
+                os.chdir(cwd)

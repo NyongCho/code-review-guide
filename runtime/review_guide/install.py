@@ -9,6 +9,7 @@ from pathlib import Path
 
 from . import __version__
 from .contracts import Json, ValidationError, relative_path, require, validate_config
+from .workflows import render_workflows
 
 START, END = "<!-- review-guide:start -->", "<!-- review-guide:end -->"
 
@@ -77,6 +78,7 @@ def plan_install(target: Path, bundle: Path, config: Json) -> Json:
     manifest_path = safe_target(target, ".review/manifest.json")
     previous = json.loads(_read(manifest_path) or '{"files":{}}')
     files = _bundle_files(bundle)
+    files.update(render_workflows(cfg))
     files[".review/config.json"] = json.dumps(cfg, ensure_ascii=False, indent=2) + "\n"
     block = ("리뷰 체계의 첫 배포·인증 도입·마이그레이션·사고·모델 변경 시 "
              "`.agents/skills/review-maintain/SKILL.md`를 읽고 점검한다.\n"

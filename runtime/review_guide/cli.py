@@ -39,6 +39,10 @@ def main(argv: list[str] | None = None) -> int:
     transition = sub.add_parser("advance", help="advance a trusted run with one event")
     for name in ("config", "state", "event", "output"):
         transition.add_argument("--" + name, type=Path, required=True)
+    ci = sub.add_parser("ci", help="protected workflow controller; not a worker API")
+    ci.add_argument("operation", choices=["entry", "tests", "inspect", "prepare-worker", "worker", "normalize-worker", "collect", "finish", "approval", "fetch-artifact"])
+    ci.add_argument("--name")
+    ci.add_argument("--destination", type=Path)
     args = parser.parse_args(argv)
     try:
         if args.command == "validate":
@@ -67,6 +71,9 @@ def main(argv: list[str] | None = None) -> int:
             result = advance(json.loads(args.state.read_text()), json.loads(args.event.read_text()),
                              json.loads(args.config.read_text()))
             args.output.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n")
+        elif args.command == "ci":
+            from .pipeline import ci_main
+            result = ci_main(args.operation, args.name, args.destination)
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
     except (ValidationError, OSError, json.JSONDecodeError) as exc:

@@ -97,7 +97,8 @@ def advance(state: Json, event: Json, config: Json) -> Json:
         return _finish(result, model["status"], raw.get("reason", model["summary"]))
     if role in {"bugs", "security"}:
         result["candidates"][role] = model["findings"]
-        result["risk"] = classify_risk(result.get("changed_paths", []), model["risk"], cfg)["risk"]
+        risk = classify_risk(result.get("changed_paths", []), model["risk"], cfg)["risk"]
+        result["risk"] = max((risk, result.get("risk", "low")), key={"low": 0, "medium": 1, "high": 2}.get)
         return _budget(_next(result, "security" if role == "bugs" else "verify"), cfg)
     if role == "fix":
         if not model["patch"]:
@@ -111,6 +112,8 @@ def advance(state: Json, event: Json, config: Json) -> Json:
     expected = {item["id"] for item in result["open_findings"]}
     expected.update(item["id"] for items in result["candidates"].values() for item in items)
     dispositions = {item["id"]: item for item in model["dispositions"]}
+    if len(dispositions) != len(model["dispositions"]):
+        return _finish(result, "incomplete", "duplicate verifier disposition")
     if not expected.issubset(dispositions):
         return _finish(result, "incomplete", "verifier omitted prior finding disposition")
     confirmed = {item["id"] for item in model["findings"]}
