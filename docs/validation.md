@@ -16,8 +16,8 @@
 | Branch protection | 공개 샘플 음성 인수 통과 | private는 Pro 요구403. 공개 샘플의 strict·관리자 적용·전용 App 출처 필수 설정. 실패 ci 및 잘못된 App의 같은 이름 성공 검사로 exact-head 머지 시도 시405 거절 |
 | API 공식 Action 격리 | 합성 원격 통과 | pinned0.169.0, fake key/no prompt. 파일·쓰기·네트워크·root 승격·시작 지침·외부 프로세스 환경/메모리 canary 통과. 실제 모델·키 호출과 구분 |
 | 설치된 테스트 컨테이너 | 합성 원격 통과 | 실제 `test_command`로 호스트·home·Docker socket·환경변수·네트워크·쓰기·UID·capabilities·메모리·프로세스 제한 확인. 모델 호출 없음 |
-| 전용 게시 App | 부분 검증 | App ID·보호 Secret 등록, 위조 check 거절 통과. 실제 토큰 발급은 Invalid keyData로 실패하여 키 재등록 대기; App 게시 성공은 아직 미확인 |
-| API 실제 모델 호출 | needs_verification | 전체 검증 예산 US$5 승인. 키 연결 및 호출 전; 사용 비용 0 |
+| 전용 게시 App | 합성 원격 통과 | 키 재등록 후 인증·토큰 폐기·진행 중 검사·최종 CI/사람/AI 검사·댓글 게시 성공. 위조 성공 검사와 실제 사람 확인 실패를 구분하여 머지 거절 |
+| API 실제 모델 호출 | needs_verification | 전체 검증 예산 US$5 승인, 보호 환경 키 등록. 공급자 hard limit은 미확인 상태로 사용자가 진행 요청; 일회성 짧은 호출과 사용량 확인부터 시작. 유료 호출 전, 사용 비용0 |
 | 정상/버그/민감 실제 PR | needs_verification | 구독 private / API public 샘플의 원격 PR/head/run/check 증거 필요 |
 | 실제 반복 평가·사람 정답 | needs_verification | 합성 판정 fixture를 실제 사용자의 정답 승인으로 취급하지 않음 |
 | 배포·운영 복구 | pending_applicability | 첫 배포 전 기능 차단/롤백/감지 근거를 프로젝트별로 확보 |
@@ -66,3 +66,5 @@ python3 scripts/check_workflows.py
 [샘플 PR6](https://github.com/NyongCho/code-review-guide-sample/pull/6)에 guide `940587c`를 설치했고, [테스트 컨테이너 canary](https://github.com/NyongCho/code-review-guide-sample/actions/runs/43824609484)의 12개 검사를 통과했다. 진입·모델 설정은 여전히 `needs_verification`이며 실제 모델 호출은 비활성이다. `review-approval`은 main만 허용하고 본인의 명시적 확인을 요구하도록 설정했다. 1인 확인을 독립된 두 사람의 승인으로 간주하지 않는다.
 
 [위조 검사 PR7](https://github.com/NyongCho/code-review-guide-sample/pull/7)에서 일반 GitHub Actions App이 `review-guide/ci`·`review-guide/human` 성공을 게시했지만, GitHub는 지정된 App 출처가 아니라며 해당 head의 머지를 HTTP405로 거절했다. [전용 App 토큰 발급 실행](https://github.com/NyongCho/code-review-guide-sample/actions/runs/43825112981)은 키 파싱에 실패했다. 키가 실제로 유효하다는 증거로 Secret 이름의 존재만 사용하지 않는다.
+
+키 재등록 후 실제 연동에서 발견한 두 오류를 수정했다. 진행 중 검사 요청의 `conclusion:null`은 GitHub가422로 거절하여 필드를 생략하며, artifact의 PR event SHA와 보호된 workflow SHA를 별도로 검증한다. [완료한 제어 흐름](https://github.com/NyongCho/code-review-guide-sample/actions/runs/43827168365)은 실제 컨테이너 테스트 성공, 모델 호출0, App의 CI success·human failure·AI neutral 및 댓글을 게시했다. 같은 head의 위조 human success가 있어도 머지는405로 거절되었다. 이 결과는 AI 리뷰 품질의 증거가 아니다.
