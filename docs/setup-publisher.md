@@ -39,4 +39,6 @@ GitHub의 required check는 commit SHA와 App 출처에 연결되며 PR 제목·
 
 App key 회전은 새 key를 환경 secret에 등록하고 합성 검사를 확인한 뒤 이전 key를 폐기한다. App 설치 해제·권한 변경·ID 불일치는 실행 실패로 남긴다.
 
+토큰 발급에서 `Invalid keyData`가 나오면 Secret에 `.pem` 파일명·지문 대신 **파일 전체 내용**을 넣었는지 확인한다. BEGIN/END 줄을 포함하고 줄바꿈을 보존한다. 고정한 Action은 RSA PKCS#1·PKCS#8을 처리하므로 정상 키를 임의로 변환할 필요는 없다. Secret은 등록 후 값을 읽을 수 없으며 수정 저장 후 다시 실행해 확인한다.
+
 공식 근거: [GitHub App 등록](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/registering-a-github-app), [App token Action](https://github.com/actions/create-github-app-token), [branch protection API](https://docs.github.com/en/rest/branches/branch-protection#update-branch-protection).

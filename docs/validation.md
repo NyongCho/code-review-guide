@@ -13,10 +13,10 @@
 | Codex 파일 권한 canary | 제한적 로컬 성공 | 0.169.0에서 파일·네트워크·권한 상승 거절. 전역 AGENTS 로딩 위험을 발견하여 실행 전 거절. 실제 서버는 bubblewrap 부재로 실패 |
 | 제한된 SSH worker | 로컬 통과 / 실제 서버 needs_verification | 서버 소유 경로·allowlist·버전·deadline·zip 거절, forced-command CLI와 가짜 SSH 종단간 검사. 실제 전용 계정·bubblewrap·키 연결 필요 |
 | GitHub 보호 환경 | 합성 원격 통과 | main dispatch 성공, PR의 기존·신규 workflow 거절. 실제 key는 미등록 |
-| Branch protection | 공개 샘플 설정 완료 | private는 Pro 요구403. 사용자 요청으로 합성 샘플을 공개 전환; 필수 ci와 관리자 적용 설정 확인. 합성 실패 ci의 exact-head 머지 시도405 거절 확인. 별도 게시 App 출처 위조 검사는 아직 필요 |
+| Branch protection | 공개 샘플 음성 인수 통과 | private는 Pro 요구403. 공개 샘플의 strict·관리자 적용·전용 App 출처 필수 설정. 실패 ci 및 잘못된 App의 같은 이름 성공 검사로 exact-head 머지 시도 시405 거절 |
 | API 공식 Action 격리 | 합성 원격 통과 | pinned0.169.0, fake key/no prompt. 파일·쓰기·네트워크·root 승격·시작 지침·외부 프로세스 환경/메모리 canary 통과. 실제 모델·키 호출과 구분 |
 | 설치된 테스트 컨테이너 | 합성 원격 통과 | 실제 `test_command`로 호스트·home·Docker socket·환경변수·네트워크·쓰기·UID·capabilities·메모리·프로세스 제한 확인. 모델 호출 없음 |
-| 전용 게시 App | needs_verification | 로컬 출처·strict 보호 검사 통과. App 등록/키 연결/위조 check 음성 인수 필요 |
+| 전용 게시 App | 부분 검증 | App ID·보호 Secret 등록, 위조 check 거절 통과. 실제 토큰 발급은 Invalid keyData로 실패하여 키 재등록 대기; App 게시 성공은 아직 미확인 |
 | API 실제 모델 호출 | needs_verification | 전체 검증 예산 US$5 승인. 키 연결 및 호출 전; 사용 비용 0 |
 | 정상/버그/민감 실제 PR | needs_verification | 구독 private / API public 샘플의 원격 PR/head/run/check 증거 필요 |
 | 실제 반복 평가·사람 정답 | needs_verification | 합성 판정 fixture를 실제 사용자의 정답 승인으로 취급하지 않음 |
@@ -64,3 +64,5 @@ python3 scripts/check_workflows.py
 추가 증거: [게시 환경 main 성공](https://github.com/NyongCho/code-review-guide-sample/actions/runs/43822772399), [게시 환경 PR 차단](https://github.com/NyongCho/code-review-guide-sample/actions/runs/43822653001), [프로세스 경계까지 포함한 API 합성 격리](https://github.com/NyongCho/code-review-guide-sample/actions/runs/43822775874). [독립 구현 검토와 수정](superpowers/reviews/2026-11-16-code-review.md).
 
 [샘플 PR6](https://github.com/NyongCho/code-review-guide-sample/pull/6)에 guide `940587c`를 설치했고, [테스트 컨테이너 canary](https://github.com/NyongCho/code-review-guide-sample/actions/runs/43824609484)의 12개 검사를 통과했다. 진입·모델 설정은 여전히 `needs_verification`이며 실제 모델 호출은 비활성이다. `review-approval`은 main만 허용하고 본인의 명시적 확인을 요구하도록 설정했다. 1인 확인을 독립된 두 사람의 승인으로 간주하지 않는다.
+
+[위조 검사 PR7](https://github.com/NyongCho/code-review-guide-sample/pull/7)에서 일반 GitHub Actions App이 `review-guide/ci`·`review-guide/human` 성공을 게시했지만, GitHub는 지정된 App 출처가 아니라며 해당 head의 머지를 HTTP405로 거절했다. [전용 App 토큰 발급 실행](https://github.com/NyongCho/code-review-guide-sample/actions/runs/43825112981)은 키 파싱에 실패했다. 키가 실제로 유효하다는 증거로 Secret 이름의 존재만 사용하지 않는다.
