@@ -1,0 +1,133 @@
+import unittest
+import contextlib
+import io
+import json
+import tempfile
+from pathlib import Path
+
+from runtime.review_guide.lifecycle import initial_state, advance, required_checks
+from runtime.review_guide.contracts import ValidationError, validate_config
+from tests.fixtures import sample_config, sample_run, output, finding
+from tests.git_fixture import patch_file
+
+
+class LifecycleTests(unittest.TestCase):
+    def setUp(self):
+        self.cfg = validate_config(sample_config() | {"auto_fix": True})
+        self.state = initial_state(sample_run(), self.cfg)
+        self.sequence = 0
+
+    def event(self, kind, **kwargs):
+        self.sequence += 1
+        event = {"id": str(self.sequence), "kind": kind, "head_sha": self.state["head_sha"],
+                 "at": "2026-11-16T00:00:00Z", **kwargs}
+        self.state = advance(self.state, event, self.cfg)
+        return self.state
+
+    def review(self, findings=None, dispositions=None):
+        findings = findings or []
+        self.event("model_result", role="bugs", result=output(findings))
+        self.event("model_result", role="security", result=output())
+        self.event("model_result", role="verify", result=output(findings) | {"dispositions": dispositions or [
+            {"id": f["id"], "decision": "confirmed", "reason": "reproduced in code"} for f in findings]})
+
+    def fixed(self):
+        self.event("model_result", role="fix", result=output() | {"patch": patch_file()})
+        new_sha = str(self.state["round"]) * 40
+        self.event("patch_result", result={"status": "verified", "head_sha": new_sha, "input_digest": "f" * 64})
+        self.event("tests_result", passed=True)
+
+    def test_clean_review_requires_ci(self):
+        self.review()
+        self.assertFalse(self.state["terminal"])
+        self.event("tests_result", passed=True)
+        self.assertEqual(self.state["status"], "verified")
+        self.assertEqual(required_checks(self.state, self.cfg)["ci"], "success")
+
+    def test_cli_advances_serialized_state(self):
+        from runtime.review_guide.cli import main
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for name, value in {"config": self.cfg, "state": self.state, "event": {
+                "id": "tests", "kind": "tests_result", "head_sha": self.state["head_sha"],
+                "at": "2026-11-16T00:00:00Z", "passed": True}}.items():
+                (root / name).write_text(json.dumps(value))
+            with contextlib.redirect_stdout(io.StringIO()):
+                code = main(["advance", "--config", str(root / "config"), "--state", str(root / "state"),
+                             "--event", str(root / "event"), "--output", str(root / "output")])
+            self.assertEqual(code, 0)
+            self.assertEqual(json.loads((root / "output").read_text())["ci_status"], "passed")
+
+    def test_fix_requires_new_head_tests_and_fresh_review(self):
+        self.review([finding()])
+        self.assertEqual(self.state["next_role"], "fix")
+        self.fixed()
+        self.assertEqual(self.state["next_role"], "bugs")
+        self.assertNotEqual(self.state["status"], "verified")
+        self.review([], [{"id": finding()["id"], "decision": "resolved", "reason": "fixed in current code"}])
+        self.assertEqual(self.state["status"], "verified")
+        self.assertEqual(self.state["tested_head"], self.state["head_sha"])
+        self.assertEqual(self.state["reviewed_head"], self.state["head_sha"])
+
+    def test_round_three_still_requires_final_review(self):
+        for i in range(1, 4):
+            issue = finding() | {"id": f"issue-{i}"}
+            previous = [{"id": f"issue-{i-1}", "decision": "resolved", "reason": "previous issue fixed"}] if i > 1 else []
+            self.review([issue], previous + [{"id": issue["id"], "decision": "confirmed", "reason": "new issue"}])
+            self.fixed()
+        self.assertEqual(self.state["round"], 3)
+        self.assertNotEqual(self.state["status"], "verified")
+        self.review([], [{"id": "issue-3", "decision": "resolved", "reason": "fixed"}])
+        self.assertEqual(self.state["status"], "verified")
+
+    def test_repeated_failure_stops(self):
+        self.review([finding()])
+        self.fixed()
+        self.review([finding()])
+        self.assertEqual(self.state["status"], "needs_human")
+        self.assertTrue(self.state["terminal"])
+
+    def test_sensitive_fix_is_not_silently_applied(self):
+        self.review([finding()])
+        self.event("model_result", role="fix", result=output() | {"patch": patch_file(".review/config.json")})
+        self.assertEqual(self.state["status"], "needs_human")
+
+    def test_verified_finding_is_not_closed_without_reason(self):
+        self.event("model_result", role="bugs", result=output([finding()]))
+        self.event("model_result", role="security", result=output())
+        self.event("model_result", role="verify", result=output())
+        self.assertEqual(self.state["status"], "incomplete")
+
+    def test_observe_does_not_hide_failure(self):
+        self.event("tests_result", passed=True)
+        self.event("model_result", role="bugs", result=output() | {"status": "incomplete"})
+        checks = required_checks(self.state, self.cfg)
+        self.assertEqual(self.state["status"], "incomplete")
+        self.assertEqual((checks["ci"], checks["ai"]), ("success", "neutral"))
+
+    def test_blocking_requires_approved_policy(self):
+        cfg = self.cfg | {"review_mode": "block", "blocking_approval": {"source": "example"}}
+        self.assertEqual(required_checks(self.state, cfg)["ai"], "failure")
+
+    def test_deadline_blocks_new_calls_and_pushes(self):
+        self.event("tick", at="2100-01-01T00:00:00Z")
+        self.assertEqual(self.state["status"], "incomplete")
+        self.assertIsNone(self.state["next_role"])
+        self.assertTrue(self.state["terminal"])
+
+    def test_duplicate_event_is_idempotent_and_stale_head_stops(self):
+        event = {"id": "same", "kind": "tests_result", "head_sha": self.state["head_sha"], "passed": True,
+                 "at": "2026-11-16T00:00:00Z"}
+        once = advance(self.state, event, self.cfg)
+        self.assertEqual(advance(once, event, self.cfg), once)
+        with self.assertRaises(ValidationError):
+            advance(once, event | {"passed": False}, self.cfg)
+        stale = advance(once, event | {"id": "new", "head_sha": "0" * 40}, self.cfg)
+        self.assertEqual(stale["reason"], "stale_head")
+
+    def test_api_budget_stops_before_next_model_call(self):
+        cfg = self.cfg | {"mode": "api", "api_budget": {"approved_usd": 5, "max_calls": 1}}
+        self.cfg = cfg
+        self.state = initial_state(sample_run() | {"mode": "api", "auth_kind": "api_key"}, cfg)
+        self.event("model_result", role="bugs", result=output())
+        self.assertEqual(self.state["reason"], "model call budget exhausted")

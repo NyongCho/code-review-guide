@@ -8,6 +8,7 @@ from pathlib import Path
 from .contracts import ValidationError, validate_config
 from .install import apply_install, plan_install
 from .codex import build_request, normalize_action, normalize_result, run_codex
+from .lifecycle import advance
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -35,6 +36,9 @@ def main(argv: list[str] | None = None) -> int:
     normalize.add_argument("--output", type=Path, required=True)
     normalize.add_argument("--action-outcome", choices=["success", "failure", "cancelled", "skipped"])
     normalize.add_argument("--exit-code", type=int, default=0)
+    transition = sub.add_parser("advance", help="advance a trusted run with one event")
+    for name in ("config", "state", "event", "output"):
+        transition.add_argument("--" + name, type=Path, required=True)
     args = parser.parse_args(argv)
     try:
         if args.command == "validate":
@@ -58,6 +62,10 @@ def main(argv: list[str] | None = None) -> int:
             raw = args.raw.read_text() if args.raw.is_file() else ""
             result = (normalize_action(raw, args.action_outcome) if args.action_outcome
                       else normalize_result(raw, args.exit_code, False))
+            args.output.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n")
+        elif args.command == "advance":
+            result = advance(json.loads(args.state.read_text()), json.loads(args.event.read_text()),
+                             json.loads(args.config.read_text()))
             args.output.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n")
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
