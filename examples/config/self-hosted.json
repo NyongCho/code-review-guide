@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "repository": "OWNER/PRIVATE_PROJECT",
+  "allowed_actors": ["YOUR_GITHUB_LOGIN"],
+  "mode": "self_hosted",
+  "model": "gpt-6-astra",
+  "effort": "low",
+  "codex_version": "0.169.0",
+  "test_commands": [["python3", "-m", "unittest", "discover", "-s", "tests"]],
+  "review_mode": "observe",
+  "auto_fix": false,
+  "max_rounds": 3,
+  "entry_isolation": {"status": "needs_verification"},
+  "isolation": {"status": "needs_verification"}
+}
