@@ -15,6 +15,7 @@
 | GitHub 보호 환경 | 합성 원격 통과 | main dispatch 성공, PR의 기존·신규 workflow 거절. 실제 key는 미등록 |
 | Branch protection | 공개 샘플 설정 완료 | private는 Pro 요구403. 사용자 요청으로 합성 샘플을 공개 전환; 필수 ci와 관리자 적용 설정 확인. 합성 실패 ci의 exact-head 머지 시도405 거절 확인. 별도 게시 App 출처 위조 검사는 아직 필요 |
 | API 공식 Action 격리 | 합성 원격 통과 | pinned0.169.0, fake key/no prompt. 파일·쓰기·네트워크·root 승격·시작 지침·외부 프로세스 환경/메모리 canary 통과. 실제 모델·키 호출과 구분 |
+| 설치된 테스트 컨테이너 | 합성 원격 통과 | 실제 `test_command`로 호스트·home·Docker socket·환경변수·네트워크·쓰기·UID·capabilities·메모리·프로세스 제한 확인. 모델 호출 없음 |
 | 전용 게시 App | needs_verification | 로컬 출처·strict 보호 검사 통과. App 등록/키 연결/위조 check 음성 인수 필요 |
 | API 실제 모델 호출 | needs_verification | 전체 검증 예산 US$5 승인. 키 연결 및 호출 전; 사용 비용 0 |
 | 정상/버그/민감 실제 PR | needs_verification | 구독 private / API public 샘플의 원격 PR/head/run/check 증거 필요 |
@@ -61,3 +62,5 @@ python3 scripts/check_workflows.py
 독립 전체 코드 검토에서 중요한 문제6개와 낭비되는 후속 job을 발견해 보완했다. 가변 PR 설명 대신 커밋 메시지를 승인 의도로 사용하며, 필수 검사는 별도 App ID·strict branch 보호에 묶는다. 원격 App 인수가 끝나기 전 운영 완료로 표시하지 않는다.
 
 추가 증거: [게시 환경 main 성공](https://github.com/NyongCho/code-review-guide-sample/actions/runs/43822772399), [게시 환경 PR 차단](https://github.com/NyongCho/code-review-guide-sample/actions/runs/43822653001), [프로세스 경계까지 포함한 API 합성 격리](https://github.com/NyongCho/code-review-guide-sample/actions/runs/43822775874). [독립 구현 검토와 수정](superpowers/reviews/2026-11-16-code-review.md).
+
+[샘플 PR6](https://github.com/NyongCho/code-review-guide-sample/pull/6)에 guide `940587c`를 설치했고, [테스트 컨테이너 canary](https://github.com/NyongCho/code-review-guide-sample/actions/runs/43824609484)의 12개 검사를 통과했다. 진입·모델 설정은 여전히 `needs_verification`이며 실제 모델 호출은 비활성이다. `review-approval`은 main만 허용하고 본인의 명시적 확인을 요구하도록 설정했다. 1인 확인을 독립된 두 사람의 승인으로 간주하지 않는다.
