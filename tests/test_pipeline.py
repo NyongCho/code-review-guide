@@ -96,7 +96,7 @@ class PipelineTests(unittest.TestCase):
             def transport(method, path, data=None):
                 if path.endswith('/actions/runs/42'):
                     from runtime.review_guide.pipeline import now
-                    return {'created_at': now()}
+                    return {'created_at': '2020-01-01T00:00:00Z', 'run_started_at': now()}
                 return original(method, path, data)
             cwd = Path.cwd()
             try:
