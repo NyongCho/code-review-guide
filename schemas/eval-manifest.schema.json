@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "eval-manifest",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "corpus_digest": {
+      "type": "string"
+    },
+    "rubric_digest": {
+      "type": "string"
+    },
+    "expected": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "case_id": {
+            "type": "string"
+          },
+          "configuration_digest": {
+            "type": "string"
+          },
+          "trial_index": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "case_id",
+          "configuration_digest",
+          "trial_index"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "corpus_digest",
+    "rubric_digest",
+    "expected"
+  ],
+  "additionalProperties": true
+}

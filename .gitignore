@@ -1,0 +1,9 @@
+.superpowers/
+__pycache__/
+*.py[cod]
+.venv/
+.review/runs/
+.review/proposals/
+.env
+.env.*
+auth.json
