@@ -158,6 +158,11 @@ class GitHubTests(unittest.TestCase):
         publish_result(state,sample_config(),self.api,self.publisher)
         begin_checks(state,sample_config(),self.publisher)
         self.assertTrue(all(c['status']=='in_progress' for c in self.fake.checks))
+        writes = [data for method, path, data in self.fake.requests
+                  if method in {'POST', 'PATCH'} and '/check-runs' in path and data['status'] == 'in_progress']
+        self.assertTrue(writes)
+        self.assertTrue(all('conclusion' not in data for data in writes),
+                        'GitHub rejects null conclusion in a pending check request')
         publish_result(state,sample_config(),self.api,self.publisher)
         self.fake.pr['base']['sha']='c'*40
         result=publish_result(state,sample_config(),self.api,self.publisher)
