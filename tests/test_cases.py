@@ -34,6 +34,14 @@ class CaseTests(unittest.TestCase):
         (self.snapshot/'source/src/total.py').write_text('tampered')
         with self.assertRaises(ValidationError): propose_case(self.run, self.snapshot, self.candidate)
 
+    def test_evaluation_input_preserves_commit_bound_intent_without_origin_links(self):
+        self.run['intent'] = {'head_commit_message':
+                             'Count every repeated amount. See https://example.test/private/pr/1'}
+        propose_case(self.run, self.snapshot, self.candidate)
+        context = json.loads((self.candidate/'input/context.json').read_text())
+        self.assertEqual(context.get('head_commit_message'),
+                         'Count every repeated amount. See [external reference omitted]')
+
     def test_worker_approval_json_is_rejected_even_if_fields_match(self):
         case = propose_case(self.run, self.snapshot, self.candidate)
         forged = {'actor':'human','authority':'operator','at':'2026-11-16T00:00:00Z',
