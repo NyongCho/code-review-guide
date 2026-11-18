@@ -254,6 +254,22 @@ class PatchTests(unittest.TestCase):
                 if status == 'verified':
                     self.assertEqual(result['input_digest'], input_digest(published))
 
+    def test_published_head_read_must_complete_before_deadline(self):
+        from datetime import datetime, timedelta
+        from runtime.review_guide.github import observe_published_head
+        original = pr()
+        run = sample_run() | {'input_digest': input_digest(original)}
+        deadline = datetime.fromisoformat(run['deadline_at'].replace('Z', '+00:00'))
+        published = copy.deepcopy(original)
+        published['head']['sha'] = 'f' * 40
+        with mock_patch('runtime.review_guide.github.datetime', wraps=datetime) as clock:
+            clock.now.return_value = deadline - timedelta(seconds=1)
+            def slow_read(method, path, data):
+                clock.now.return_value = deadline
+                return published
+            result = observe_published_head(run, published['head']['sha'], GitHub('', slow_read))
+        self.assertEqual(result, {'status': 'incomplete', 'reason': 'deadline expired'})
+
     def test_expired_run_cannot_push(self):
         from runtime.review_guide.github import publish_patch
         fake = Fake()
