@@ -90,3 +90,5 @@ PR15는 사람 승인과 필수 CI를 통과해 샘플 main에 병합됐다(`784
 [복구 커밋 재검증](https://github.com/NyongCho/code-review-guide-sample/actions/runs/44237646781)에서 테스트와 버그·보안·최종 검증이 같은 커밋 `b5acf91`에 대해 통과했다. 최종 상태는 `verified`, 지적은 0건이었다. 이 실행까지의 API 사용량 기준 누적 보수 추정은 US$0.3696다.
 
 PR13은 검증한 복구 커밋으로 병합됐다(`9665c88`). main과의 최종 차이는 중복 금액 회귀 테스트 한 개다. 이후 두 형식 오류를 실행 기록에서 재생해 재작성 1회, 반복 실패 시 보류, 이미 검증한 올바른 패치를 입력했을 때 게시 단계 진입을 로컬에서 확인했다. 모델이 스스로 올바른 재작성을 생성해 원격 커밋을 게시하는 과정은 별도 검증 대상으로 남아 있다.
+
+[샘플 PR16](https://github.com/NyongCho/code-review-guide-sample/pull/16)은 커밋 `8d8391f`에 대한 승인과 세 필수 검사 통과 후 `9e418b2`로 병합됐다. 로컬 Git 2.53과 GitHub 러너의 Git 2.56에서 잘못된 diff의 진단 문구가 달라 형식 오류 분류를 수정했고, [가이드 CI의 122개 테스트](https://github.com/NyongCho/code-review-guide/actions/runs/44239426489)가 통과했다. [샘플 AI 리뷰](https://github.com/NyongCho/code-review-guide-sample/actions/runs/44239506203)는 새 커밋에서 형식 재작성을 다시 허용할지 지적했고 보호 경로라 `needs_human`으로 끝났다. 첫 재작성 후 생성된 새 커밋에서 다시 오류를 내는 입력을 재생했다. 실행 전체에서 재작성 한 번을 소비한 뒤 사람에게 넘기는 것이 운영 규칙과 일치해 이 동작을 유지했다.
