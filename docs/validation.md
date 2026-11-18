@@ -18,7 +18,7 @@
 | 설치된 테스트 컨테이너 | 합성 원격 통과 | 실제 `test_command`로 호스트·home·Docker socket·환경변수·네트워크·쓰기·UID·capabilities·메모리·프로세스 제한 확인. 모델 호출 없음 |
 | 전용 게시 App | 합성 원격 통과 | 키 재등록 후 인증·토큰 폐기·진행 중 검사·최종 CI/사람/AI 검사·댓글 게시 성공. 위조 성공 검사와 실제 사람 확인 실패를 구분하여 머지 거절 |
 | API 실제 모델 호출 | 제한적 실제 통과 | Codex0.169.0/gpt-6-luna/low, 고정 prompt 응답 검증. 입력10057·출력15 토큰 관측, 보수적 표준 요금 추정 약US$0.0013. 전체 예산US$5; 공급자 hard limit은 미확인. 리뷰 품질 검증과 구분 |
-| 정상/버그/민감 실제 PR | API 정상·버그 검출 확인 / 자동 수정 검증 중 | PR12의 bugs/security/verify 지적0, 같은 head의 실제 테스트·App 검사 통과 후 보호 설정 유지하여 머지. PR13에서 버그 확인. 수정 커밋 게시·민감 PR·구독 경로는 미완료 |
+| 정상/버그/민감 실제 PR | API 정상·버그 검출 확인 / 자동 수정 검증 중 | PR12의 bugs/security/verify 지적0, 같은 head의 실제 테스트·App 검사 통과 후 보호 설정 유지하여 머지. PR13에서 버그 확인. 운영자 복구 커밋의 테스트·재리뷰 통과. 자동 커밋 게시·민감 PR·구독 경로는 미완료 |
 | 실제 반복 평가·사람 정답 | needs_verification | 합성 판정 fixture를 실제 사용자의 정답 승인으로 취급하지 않음 |
 | 배포·운영 복구 | pending_applicability | 첫 배포 전 기능 차단/롤백/감지 근거를 프로젝트별로 확보 |
 
@@ -45,7 +45,7 @@ python3 scripts/check_workflows.py
 | 1 설치·사용자 편집 보존 | install 테스트·스킬 행동 검사 통과 | pending | pending |
 | 2 정상 PR·오탐 | acceptance 모의 통과 | pending | PR12 정상 사례 1건 지적0 |
 | 3 버그 지적·별도 검증 | acceptance 모의 통과 | pending | PR13 재실행에서 중복 금액 버그를 검출하고 별도 검증자가 확정 |
-| 4 수정·회귀 검사·재리뷰 | 실제 Git/Python + 모의 모델 통과 | pending | pending |
+| 4 수정·회귀 검사·재리뷰 | 실제 Git/Python + 모의 모델 통과 | pending | PR13 모델 작성 패치를 운영자가 보정·게시한 뒤 통과. 자동 게시 미검증 |
 | 5 민감 변경 사람 확인 | policy/lifecycle 테스트 통과 | pending | pending |
 | 6 중복·stale·상한·실패 | lifecycle/GitHub/adapter 테스트 통과 | pending | pending |
 | 7 후보·사람 정답 | 후보와 서명 경계 통과, 실제 정답 미확정 | pending | pending |
@@ -82,3 +82,9 @@ python3 scripts/check_workflows.py
 [PR13 재검증](https://github.com/NyongCho/code-review-guide-sample/actions/runs/44225933427)에서 첫 시도는 두 리뷰어가 각각 낸 F1을 별도 ID로 보존하고 검증자에게 전달했다. 검증자는 두 ID를 확정하고 최종 지적에는 하나만 남겨 실행기가 수정을 보류했다. 같은 커밋의 두 번째 시도에서는 검증자가 한 건을 확정했고 수정 모델은 중복 금액을 복원하는 패치를 생성했다. 새 회귀 테스트는 생성하지 않았다. 게시기의 임시 clone에서 얕게 가져온 PR 커밋을 찾지 못해 원격 커밋과 재리뷰 단계는 실행되지 않았다.
 
 실제 모델 패치를 임시 저장소에 적용해 기존 테스트 두 개와 중복 입력 합계 400을 확인했다. [게시기 수정 PR15](https://github.com/NyongCho/code-review-guide-sample/pull/15)는 임시 저장소로 현재 PR 커밋을 직접 가져오고, 검증자와 수정자에게 중복 지적 처리와 새 테스트의 허용 범위를 알려준다. GitHub와 같은 shallow fetch 조건에서 게시 오류를 재현한 뒤 전체 119개 테스트를 통과했다.
+
+PR15는 사람 승인과 필수 CI를 통과해 샘플 main에 병합됐다(`7848699`). 해당 리뷰는 얕은 체크아웃에서 브랜치 이름 없이 커밋을 가져올 수 있는지 지적했다. 실제 PR 커밋이 FETCH_HEAD에만 있는 조건에서 패치 적용 결과가 기대 트리와 일치함을 확인했다. 이 PR의 AI 수정 단계는 출력 형식 오류로 끝났다.
+
+[PR13 자동 수정 시도](https://github.com/NyongCho/code-review-guide-sample/actions/runs/44236011590)에서 모델은 합계 수정과 회귀 테스트를 작성했다. 첫 패치는 작업 디렉터리 접두사와 잘못된 hunk 줄 수를 포함해 거절됐다. 재실행은 응답 상태가 `findings`인데 지적 목록이 비어 있어 거절됐다. 운영자가 첫 패치의 경로와 줄 수를 바로잡았다. 새 테스트는 원래 코드에서 100과 200의 차이로 실패했고 수정을 적용한 뒤 세 테스트 모두 통과했다. [복구 커밋](https://github.com/NyongCho/code-review-guide-sample/commit/b5acf915ce18c29975b389f38a9d239c640243af)은 운영자가 게시했다.
+
+[복구 커밋 재검증](https://github.com/NyongCho/code-review-guide-sample/actions/runs/44237646781)에서 테스트와 버그·보안·최종 검증이 같은 커밋 `b5acf91`에 대해 통과했다. 최종 상태는 `verified`, 지적은 0건이었다. 이 실행까지의 API 사용량 기준 누적 보수 추정은 US$0.3696다.
