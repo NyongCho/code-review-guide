@@ -33,3 +33,10 @@ def output(findings=None):
             "dispositions": []}
 
 FAKE_CODEX_HEADER = "#!/usr/bin/env python3\nimport sys\nif '--version' in sys.argv:\n print('codex-cli 0.169.0');sys.exit(0)\n"
+
+
+def file_proposal(path="src/total.py", content="return sum(items)\n", operation="replace"):
+    result = output()
+    del result["patch"]
+    result["edits"] = [{"path": path, "operation": operation, "content": content}]
+    return result

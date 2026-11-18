@@ -7,7 +7,7 @@ from pathlib import Path
 
 from runtime.review_guide.lifecycle import initial_state, advance, required_checks
 from runtime.review_guide.contracts import ValidationError, validate_config
-from tests.fixtures import sample_config, sample_run, output, finding
+from tests.fixtures import sample_config, sample_run, output, finding, file_proposal
 from tests.git_fixture import patch_file
 
 
@@ -32,7 +32,7 @@ class LifecycleTests(unittest.TestCase):
             {"id": f["id"], "decision": "confirmed", "reason": "reproduced in code"} for f in findings]})
 
     def fixed(self):
-        self.event("model_result", role="fix", result=output() | {"patch": patch_file()})
+        self.event("model_result", role="fix", result=file_proposal())
         new_sha = str(self.state["round"]) * 40
         self.event("patch_result", result={"status": "verified", "head_sha": new_sha, "input_digest": "f" * 64})
         self.event("tests_result", passed=True)
@@ -89,7 +89,7 @@ class LifecycleTests(unittest.TestCase):
 
     def test_sensitive_fix_is_not_silently_applied(self):
         self.review([finding()])
-        self.event("model_result", role="fix", result=output() | {"patch": patch_file(".review/config.json")})
+        self.event("model_result", role="fix", result=file_proposal(".review/config.json"))
         self.assertEqual(self.state["status"], "needs_human")
 
     def test_invalid_fixer_formats_get_one_budgeted_correction(self):
@@ -106,11 +106,11 @@ class LifecycleTests(unittest.TestCase):
                 self.event('model_result', role='fix', result=proposal)
                 self.assertEqual(self.state['next_role'], 'fix')
                 self.assertTrue(self.state['fix_format_feedback'])
-                self.assertNotIn('patch', self.state)
+                self.assertNotIn('edits', self.state)
                 before = self.state.copy()
                 self.event('model_result', role='fix', result=proposal)
                 self.assertTrue(self.state['terminal'])
-                self.assertNotIn('patch', self.state)
+                self.assertNotIn('edits', self.state)
                 self.state = before
                 self.fixed()
                 self.assertEqual(self.state['next_role'], 'bugs')
@@ -133,9 +133,9 @@ class LifecycleTests(unittest.TestCase):
         new = finding() | {'id': 'another-issue'}
         self.review([new], [{'id': finding()['id'], 'decision': 'resolved', 'reason': 'fixed'},
                             {'id': new['id'], 'decision': 'confirmed', 'reason': 'new defect'}])
-        self.event('model_result', role='fix', result=output() | {'patch': patch_file()})
+        self.event('model_result', role='fix', result=file_proposal())
         self.assertTrue(self.state['terminal'])
-        self.assertNotIn('patch', self.state)
+        self.assertNotIn('edits', self.state)
 
     def test_verified_finding_is_not_closed_without_reason(self):
         self.event("model_result", role="bugs", result=output([finding()]))

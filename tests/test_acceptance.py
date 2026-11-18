@@ -24,7 +24,7 @@ from runtime.review_guide.lifecycle import initial_state
 from runtime.review_guide.pipeline import collect_state, inspect_state
 from runtime.review_guide.policy import check_patch, classify_risk
 from runtime.review_guide.workspace import prepare_workspace
-from tests.fixtures import ROOT, sample_config, sample_run, output, finding
+from tests.fixtures import ROOT, sample_config, sample_run, output, finding, file_proposal
 from tests.git_fixture import init_repo, commit_files, git
 from tests import test_codex, test_github
 
@@ -110,6 +110,10 @@ class AcceptanceTests(unittest.TestCase):
                 state=inspect_state(state,cfg,{'status':'passed','head_sha':head} if self.assert_tests_pass(workspace) else None,api)
                 issue=finding()|{'line':2}
                 def model(value):
+                    if 'patch' in value:
+                        value = value.copy()
+                        self.assertEqual(value.pop('patch'), '')
+                        value['edits'] = []
                     request=build_request(state['next_role'],state,workspace,cfg)
                     if mode=='api': return normalize_action(json.dumps(value),'success')
                     executable=root/'fake-codex'
@@ -121,15 +125,16 @@ class AcceptanceTests(unittest.TestCase):
                 self.assertEqual(state['next_role'],'fix')
                 old_stages={h['role']:h['result'] for h in state['history']}
                 candidate=root/'bug-candidate'; bug_case=propose_case(state,workspace,candidate)
-                fix='diff --git a/src/total.py b/src/total.py\n--- a/src/total.py\n+++ b/src/total.py\n@@ -1,2 +1,2 @@\n def total_cents(items: list[int]) -> int:\n-    return sum(set(items))\n+    return sum(items)\n'
                 regression='import unittest\nfrom src.total import total_cents\n\nclass DuplicateTests(unittest.TestCase):\n    def test_duplicates(self):\n        self.assertEqual(total_cents([100, 100]), 200)\n'
-                lines=regression.splitlines()
-                fix+='diff --git a/tests/test_duplicates.py b/tests/test_duplicates.py\nnew file mode 100644\n--- /dev/null\n+++ b/tests/test_duplicates.py\n@@ -0,0 +1,'+str(len(lines))+' @@\n'+''.join('+'+line+'\n' for line in lines)
+                edits = [
+                    {'path': 'src/total.py', 'operation': 'replace', 'content': 'def total_cents(items: list[int]) -> int:\n    return sum(items)\n'},
+                    {'path': 'tests/test_duplicates.py', 'operation': 'create', 'content': regression},
+                ]
                 fix_state=copy.deepcopy(state)
-                state=collect_state(state,cfg,outcomes,model(output()|{'patch':fix}),api,repo)
+                state=collect_state(state,cfg,outcomes,model(file_proposal() | {'edits': edits}),api,repo)
                 self.assertEqual(state['phase'],'tests')
                 self.assertNotEqual(state['head_sha'],head)
-                retry=publish_patch(fix_state,fix,cfg,repo,api)
+                retry=publish_patch(fix_state,edits,cfg,repo,api)
                 self.assertEqual(retry['head_sha'],state['head_sha'])
                 self.assertEqual((transport.created_commits,transport.pushes),(1,1))
                 workspace=root/'fixed-input'; prepare_workspace(repo,base,state['head_sha'],workspace,[])

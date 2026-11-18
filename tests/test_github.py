@@ -174,7 +174,8 @@ class GitHubTests(unittest.TestCase):
 class PatchTests(unittest.TestCase):
     def test_patch_retry_recovers_lost_push_response_without_second_commit(self):
         from runtime.review_guide.github import publish_patch
-        from tests.git_fixture import init_repo, commit_files, patch_file, git
+        from tests.git_fixture import init_repo, commit_files, git
+        from tests.fixtures import file_proposal
         from runtime.review_guide.contracts import validate_config
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)/'repo'; init_repo(repo)
@@ -211,8 +212,8 @@ class PatchTests(unittest.TestCase):
                 raise AssertionError((method, path))
             api = GitHub('unused', transport)
             with mock_patch('time.sleep'):
-                first = publish_patch(run, patch_file(), cfg, repo, api)
-            second = publish_patch(run, patch_file(), cfg, repo, api)
+                first = publish_patch(run, file_proposal()["edits"], cfg, repo, api)
+            second = publish_patch(run, file_proposal()["edits"], cfg, repo, api)
             self.assertEqual(first['status'], 'verified')
             self.assertEqual(second, first)
             self.assertEqual(len(commits), 1)
@@ -220,7 +221,7 @@ class PatchTests(unittest.TestCase):
             self.assertEqual(len(patches), 1)
             self.assertFalse(patches[0]['force'])
             commits[0]['tree'] = '0'*40
-            forged = publish_patch(run, patch_file(), cfg, repo, api)
+            forged = publish_patch(run, file_proposal()["edits"], cfg, repo, api)
             self.assertEqual(forged['reason'], 'stale_head')
 
     def test_read_after_push_waits_only_for_the_original_head(self):

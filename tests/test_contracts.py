@@ -9,7 +9,7 @@ from runtime.review_guide.contracts import (
     ValidationError, validate_config, validate_output, validate_run,
     validate_case, validate_eval_manifest, digest,
 )
-from tests.fixtures import ROOT, finding, output, sample_config, sample_run
+from tests.fixtures import ROOT, file_proposal, finding, output, sample_config, sample_run
 
 
 class ContractTests(unittest.TestCase):
@@ -42,6 +42,19 @@ class ContractTests(unittest.TestCase):
                              ("path", "../secret"), ("line", 0)]:
             with self.subTest(field=field), self.assertRaises(ValidationError):
                 validate_output(output([finding() | {field: value}]), "bugs")
+
+    def test_file_edits_require_unique_safe_paths_and_a_fixer(self):
+        value = file_proposal()
+        edit, = value['edits']
+        for edits in ([edit, edit], [edit | {'path': '../outside'}], [edit | {'path': 'src/.git/config'}],
+                      [edit | {'content': 'binary\0data'}], [edit | {'operation': 'delete'}],
+                      [edit | {'operation': 'other'}]):
+            with self.subTest(edits=edits), self.assertRaises(ValidationError):
+                validate_output(value | {'edits': edits}, 'fix')
+        with self.assertRaises(ValidationError):
+            validate_output(value, 'security')
+        with self.assertRaises(ValidationError):
+            validate_output(value | {'patch': 'diff'}, 'fix')
 
     def test_clean_status_cannot_hide_findings_or_malformed_output(self):
         for bad in [output([finding()]) | {"status": "verified"},
