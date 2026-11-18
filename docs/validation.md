@@ -17,7 +17,7 @@
 | API 공식 Action 격리 | 합성 원격 통과 | pinned0.169.0, fake key/no prompt. 파일·쓰기·네트워크·root 승격·시작 지침·외부 프로세스 환경/메모리 canary 통과. 실제 모델·키 호출과 구분 |
 | 설치된 테스트 컨테이너 | 합성 원격 통과 | 실제 `test_command`로 호스트·home·Docker socket·환경변수·네트워크·쓰기·UID·capabilities·메모리·프로세스 제한 확인. 모델 호출 없음 |
 | 전용 게시 App | 합성 원격 통과 | 키 재등록 후 인증·토큰 폐기·진행 중 검사·최종 CI/사람/AI 검사·댓글 게시 성공. 위조 성공 검사와 실제 사람 확인 실패를 구분하여 머지 거절 |
-| API 실제 모델 호출 | needs_verification | 전체 검증 예산 US$5 승인, 보호 환경 키 등록. 첫 연결 검사와 수정 PR 실행은 중복 CLI 옵션으로 추론 전에 중단. 수정117개 테스트 통과, 실제 모델 요청0. 공급자 hard limit은 미확인이며 사용자가 진행 요청 |
+| API 실제 모델 호출 | 제한적 실제 통과 | Codex0.169.0/gpt-6-luna/low, 고정 prompt 응답 검증. 입력10057·출력15 토큰 관측, 보수적 표준 요금 추정 약US$0.0013. 전체 예산US$5; 공급자 hard limit은 미확인. 리뷰 품질 검증과 구분 |
 | 정상/버그/민감 실제 PR | needs_verification | 구독 private / API public 샘플의 원격 PR/head/run/check 증거 필요 |
 | 실제 반복 평가·사람 정답 | needs_verification | 합성 판정 fixture를 실제 사용자의 정답 승인으로 취급하지 않음 |
 | 배포·운영 복구 | pending_applicability | 첫 배포 전 기능 차단/롤백/감지 근거를 프로젝트별로 확보 |
@@ -72,3 +72,5 @@ python3 scripts/check_workflows.py
 [범위가 지정된 사람 승인](https://github.com/NyongCho/code-review-guide-sample/actions/runs/43828021730) 후 [새 실행](https://github.com/NyongCho/code-review-guide-sample/actions/runs/43881207526)의 필수 CI·human이 성공하여 PR10을 보호 설정 변경 없이 머지했다. 오래된 workflow 재실행의 시간 기준은 `created_at` 대신 `run_started_at`을 쓰도록 수정했다.
 
 [첫 API 연결 검사](https://github.com/NyongCho/code-review-guide-sample/actions/runs/43881747910)는 공식 Action이 자동으로 넣는 `--skip-git-repo-check`를 다시 전달하여 CLI가 추론 전에 중단됐다. [수정 PR11](https://github.com/NyongCho/code-review-guide-sample/pull/11)은 중복 옵션을 제거하고 JSON 사용량 이벤트와 재실행 시간 수정을 포함한다. 실제 모델 응답·사용량은 아직 확보하지 못했다.
+
+2026-11-18: 사용자가 PR11의 정확한 커밋을 승인하고 GitHub 처리를 위임했다. [승인 작업](https://github.com/NyongCho/code-review-guide-sample/actions/runs/43882595231)과 [필수 검사](https://github.com/NyongCho/code-review-guide-sample/actions/runs/44217228690) 후 보호 설정 변경 없이 머지했다. [수정된 연결 검사](https://github.com/NyongCho/code-review-guide-sample/actions/runs/44217576459)에서 `{"ok":true}`와 완료 usage event를 확보했다. 표준 [모델 요금](https://developers.openai.com/api/docs/models/gpt-6-luna)에 따라 입력 전체를 cache-write 단가로 잡은 보수적 추정은 US$0.001264625이며 실제 청구서 확인은 아니다. 정상 PR 전체 리뷰는 [PR12](https://github.com/NyongCho/code-review-guide-sample/pull/12)에서 검증 중이다.
