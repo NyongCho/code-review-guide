@@ -104,3 +104,5 @@ PR18은 최종 `1b162b0`에 대한 사람 승인과 세 필수 검사를 통과�
 [PR20](https://github.com/NyongCho/code-review-guide-sample/pull/20)은 `0bdada9`에 대한 사람 승인과 세 필수 검사를 통과해 샘플 main에 `b06299b`로 병합됐다. [PR19 재검증](https://github.com/NyongCho/code-review-guide-sample/actions/runs/44248763444)은 이전과 동일한 크레딧 오류 및 테스트 요구사항을 사용했다. 모델이 소스 수정과 새 테스트를 작성해 `86a7565`로 자동 게시했다. Git은 7줄짜리 테스트의 헤더에 적힌 6줄만 적용했다. 같은 실행에서 해당 커밋의 CI가 실패했고 실행기는 `needs_human`으로 종료했다.
 
 [운영자 복구 커밋](https://github.com/NyongCho/code-review-guide-sample/commit/a6102695ce4bf0b4f5f322c85222453755ced683)은 모델 원본에서 빠진 마지막 검증문 한 줄을 복원했다. 새 테스트는 오류 코드에서 100과 75의 차이로 실패했고 수정 후 전체 4개가 통과했다. 가이드에서 실제 모델 출력을 재생한 결과, 헤더 뒤에 남은 변경 줄을 게시 전에 발견해 한 번 재작성을 요청했다. 같은 오류가 반복되면 중단했고, 헤더의 줄 수만 7로 바로잡은 응답은 복구 커밋과 동일한 Git 트리를 만들었다.
+
+[복원 커밋 재리뷰](https://github.com/NyongCho/code-review-guide-sample/actions/runs/44249968412)는 `a610269`에서 테스트와 버그·보안·최종 리뷰를 마쳤다. 지적은 0건이고 세 필수 검사가 통과했다. 짧은 패치 헤더를 게시 전에 검출하는 가이드 변경은 [샘플 PR21](https://github.com/NyongCho/code-review-guide-sample/pull/21)에서 확인할 수 있다.
