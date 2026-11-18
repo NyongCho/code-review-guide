@@ -4,6 +4,7 @@ import json
 import tempfile
 import unittest
 import zipfile
+from unittest.mock import patch as mock_patch
 from pathlib import Path
 from runtime.review_guide.github import (GitHub, input_digest, run_key, verify_current, verify_entry,
                                         resolve_approval, publish_result, verify_archive)
@@ -190,9 +191,10 @@ class PatchTests(unittest.TestCase):
             run = sample_run() | {'base_sha': head, 'head_sha': head, 'input_digest': input_digest(current),
                                   'intent': {'head_commit_message':'Count every item; preserve duplicates'}, 'fix_paths': ['src/total.py'], 'created_at': '2026-11-16T00:00:00Z'}
             cfg = validate_config(sample_config() | {'auto_fix': True})
-            commits, patches = [], []
+            commits, patches, delayed_reads = [], [], []
             def transport(method, path, data=None):
-                if '/pulls/1' in path: return copy.deepcopy(current)
+                if '/pulls/1' in path:
+                    return delayed_reads.pop() if delayed_reads else copy.deepcopy(current)
                 if '/git/commits/' in path:
                     return commits[0] if commits and path.endswith(commits[0]['sha']) else {'tree': {'sha': head}}
                 if path.endswith('/git/blobs'):
@@ -203,11 +205,13 @@ class PatchTests(unittest.TestCase):
                 if path.endswith('/git/commits'):
                     commits.append(data | {'sha': 'f'*40}); return commits[0]
                 if '/git/refs/heads/' in path:
+                    delayed_reads.append(copy.deepcopy(current))
                     patches.append(data); current['head']['sha'] = data['sha']
                     raise OSError('response lost')
                 raise AssertionError((method, path))
             api = GitHub('unused', transport)
-            first = publish_patch(run, patch_file(), cfg, repo, api)
+            with mock_patch('time.sleep'):
+                first = publish_patch(run, patch_file(), cfg, repo, api)
             second = publish_patch(run, patch_file(), cfg, repo, api)
             self.assertEqual(first['status'], 'verified')
             self.assertEqual(second, first)
@@ -218,6 +222,37 @@ class PatchTests(unittest.TestCase):
             commits[0]['tree'] = '0'*40
             forged = publish_patch(run, patch_file(), cfg, repo, api)
             self.assertEqual(forged['reason'], 'stale_head')
+
+    def test_read_after_push_waits_only_for_the_original_head(self):
+        from runtime.review_guide.github import observe_published_head
+        original = pr()
+        published_sha = 'f' * 40
+        published = copy.deepcopy(original)
+        published['head']['sha'] = published_sha
+        run = sample_run() | {'input_digest': input_digest(original)}
+        moved = copy.deepcopy(published)
+        moved['head']['sha'] = 'c' * 40
+        rebased = copy.deepcopy(published)
+        rebased['base']['sha'] = 'd' * 40
+        cases = [
+            ([original, original, published], 'verified', 2),
+            ([moved], 'incomplete', 0),
+            ([rebased], 'incomplete', 0),
+            ([original | {'state': 'closed'}], 'incomplete', 0),
+            ([original] * 4, 'incomplete', 3),
+        ]
+        for responses, status, waits in cases:
+            with self.subTest(responses=len(responses), status=status):
+                reads = iter(responses)
+                def read_only(method, path, data=None):
+                    self.assertEqual((method, path), ('GET', '/repos/example/project/pulls/1'))
+                    return next(reads)
+                with mock_patch('time.sleep') as sleep:
+                    result = observe_published_head(run, published_sha, GitHub('', read_only))
+                self.assertEqual(result['status'], status)
+                self.assertEqual(sleep.call_count, waits)
+                if status == 'verified':
+                    self.assertEqual(result['input_digest'], input_digest(published))
 
     def test_expired_run_cannot_push(self):
         from runtime.review_guide.github import publish_patch

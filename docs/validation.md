@@ -18,7 +18,7 @@
 | 설치된 테스트 컨테이너 | 합성 원격 통과 | 실제 `test_command`로 호스트·home·Docker socket·환경변수·네트워크·쓰기·UID·capabilities·메모리·프로세스 제한 확인. 모델 호출 없음 |
 | 전용 게시 App | 합성 원격 통과 | 키 재등록 후 인증·토큰 폐기·진행 중 검사·최종 CI/사람/AI 검사·댓글 게시 성공. 위조 성공 검사와 실제 사람 확인 실패를 구분하여 머지 거절 |
 | API 실제 모델 호출 | 제한적 실제 통과 | Codex0.169.0/gpt-6-luna/low, 고정 prompt 응답 검증. 입력10057·출력15 토큰 관측, 보수적 표준 요금 추정 약US$0.0013. 전체 예산US$5; 공급자 hard limit은 미확인. 리뷰 품질 검증과 구분 |
-| 정상/버그/민감 실제 PR | API 정상·버그 검출 확인 / 자동 수정 검증 중 | PR12의 bugs/security/verify 지적0, 같은 head의 실제 테스트·App 검사 통과 후 보호 설정 유지하여 머지. PR13에서 버그 확인. 운영자 복구 커밋의 테스트·재리뷰 통과. 자동 커밋 게시·민감 PR·구독 경로는 미완료 |
+| 정상/버그/민감 실제 PR | API 정상·버그 검출 확인 / 자동 수정 검증 중 | PR12의 bugs/security/verify 지적0, 같은 head의 실제 테스트·App 검사 통과 후 보호 설정 유지하여 머지. PR13에서 버그 확인. 운영자 복구 커밋의 테스트·재리뷰 통과. PR17은 자동 수정 커밋 게시까지 확인했다. 같은 실행에서의 수정 후 재리뷰·민감 PR·구독 경로는 미완료 |
 | 실제 반복 평가·사람 정답 | needs_verification | 합성 판정 fixture를 실제 사용자의 정답 승인으로 취급하지 않음 |
 | 배포·운영 복구 | pending_applicability | 첫 배포 전 기능 차단/롤백/감지 근거를 프로젝트별로 확보 |
 
@@ -92,3 +92,5 @@ PR15는 사람 승인과 필수 CI를 통과해 샘플 main에 병합됐다(`784
 PR13은 검증한 복구 커밋으로 병합됐다(`9665c88`). main과의 최종 차이는 중복 금액 회귀 테스트 한 개다. 이후 두 형식 오류를 실행 기록에서 재생해 재작성 1회, 반복 실패 시 보류, 이미 검증한 올바른 패치를 입력했을 때 게시 단계 진입을 로컬에서 확인했다. 모델이 스스로 올바른 재작성을 생성해 원격 커밋을 게시하는 과정은 별도 검증 대상으로 남아 있다.
 
 [샘플 PR16](https://github.com/NyongCho/code-review-guide-sample/pull/16)은 커밋 `8d8391f`에 대한 승인과 세 필수 검사 통과 후 `9e418b2`로 병합됐다. 로컬 Git 2.53과 GitHub 러너의 Git 2.56에서 잘못된 diff의 진단 문구가 달라 형식 오류 분류를 수정했고, [가이드 CI의 122개 테스트](https://github.com/NyongCho/code-review-guide/actions/runs/44239426489)가 통과했다. [샘플 AI 리뷰](https://github.com/NyongCho/code-review-guide-sample/actions/runs/44239506203)는 새 커밋에서 형식 재작성을 다시 허용할지 지적했고 보호 경로라 `needs_human`으로 끝났다. 첫 재작성 후 생성된 새 커밋에서 다시 오류를 내는 입력을 재생했다. 실행 전체에서 재작성 한 번을 소비한 뒤 사람에게 넘기는 것이 운영 규칙과 일치해 이 동작을 유지했다.
+
+[샘플 PR17](https://github.com/NyongCho/code-review-guide-sample/pull/17)은 기존 테스트 세 개를 통과하지만 음수 크레딧을 합계에서 누락하는 변경을 사용했다. [첫 실행](https://github.com/NyongCho/code-review-guide-sample/actions/runs/44240929686)에서 모델이 버그를 확인하고 첫 제안으로 소스를 수정했다. [자동 커밋](https://github.com/NyongCho/code-review-guide-sample/commit/bec60a44b94451d6f42e8d3b9d260a138e00eb98)은 새 테스트를 포함하지 않았다. 같은 실행의 게시 직후 PR head 확인은 `stale_head`로 끝났고 수정 후 테스트와 재리뷰는 건너뛰었다. 수정 커밋에서 기존 테스트 세 개와 크레딧 예시(500 − 125 = 375)를 별도로 확인했다.
