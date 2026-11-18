@@ -92,6 +92,51 @@ class LifecycleTests(unittest.TestCase):
         self.event("model_result", role="fix", result=output() | {"patch": patch_file(".review/config.json")})
         self.assertEqual(self.state["status"], "needs_human")
 
+    def test_invalid_fixer_formats_get_one_budgeted_correction(self):
+        from runtime.review_guide.codex import normalize_action
+        malformed = patch_file().replace('@@ -1 +1 @@', '@@ -1 +1,8 @@')
+        proposals = [
+            output() | {'patch': malformed},
+            normalize_action(json.dumps(output() | {'status': 'findings', 'patch': patch_file()}), 'success'),
+        ]
+        for proposal in proposals:
+            with self.subTest(proposal=proposal['status']):
+                self.state = initial_state(sample_run(), self.cfg)
+                self.review([finding()])
+                self.event('model_result', role='fix', result=proposal)
+                self.assertEqual(self.state['next_role'], 'fix')
+                self.assertTrue(self.state['fix_format_feedback'])
+                self.assertNotIn('patch', self.state)
+                before = self.state.copy()
+                self.event('model_result', role='fix', result=proposal)
+                self.assertTrue(self.state['terminal'])
+                self.assertNotIn('patch', self.state)
+                self.state = before
+                self.fixed()
+                self.assertEqual(self.state['next_role'], 'bugs')
+                self.assertIsNone(self.state['reviewed_head'])
+
+    def test_format_retry_reserves_three_calls_to_review_new_head(self):
+        self.cfg = validate_config(sample_config('api') | {'auto_fix': True, 'api_budget': {'approved_usd': 5, 'max_calls': 7}})
+        self.state = initial_state(sample_run() | {'mode': 'api', 'auth_kind': 'api_key'}, self.cfg)
+        self.review([finding()])
+        self.event('model_result', role='fix', result=output() | {'patch': patch_file().replace('@@ -1 +1 @@', '@@ -1 +1,8 @@')})
+        self.assertTrue(self.state['terminal'])
+        self.assertIn('budget', self.state['reason'])
+
+    def test_later_repair_cannot_use_slots_needed_to_review_its_commit(self):
+        self.cfg = validate_config(sample_config('api') | {'auto_fix': True, 'api_budget': {'approved_usd': 5, 'max_calls': 11}})
+        self.state = initial_state(sample_run() | {'mode': 'api', 'auth_kind': 'api_key'}, self.cfg)
+        self.review([finding()])
+        self.event('model_result', role='fix', result=output() | {'patch': patch_file().replace('@@ -1 +1 @@', '@@ -1 +1,8 @@')})
+        self.fixed()
+        new = finding() | {'id': 'another-issue'}
+        self.review([new], [{'id': finding()['id'], 'decision': 'resolved', 'reason': 'fixed'},
+                            {'id': new['id'], 'decision': 'confirmed', 'reason': 'new defect'}])
+        self.event('model_result', role='fix', result=output() | {'patch': patch_file()})
+        self.assertTrue(self.state['terminal'])
+        self.assertNotIn('patch', self.state)
+
     def test_verified_finding_is_not_closed_without_reason(self):
         self.event("model_result", role="bugs", result=output([finding()]))
         self.event("model_result", role="security", result=output())
