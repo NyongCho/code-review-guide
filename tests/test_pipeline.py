@@ -43,6 +43,33 @@ class PipelineTests(unittest.TestCase):
         self.assertTrue(state['terminal'])
         self.assertEqual(state['status'], 'incomplete')
 
+    def test_unapplicable_patch_can_be_corrected_before_any_remote_write(self):
+        from tests.git_fixture import commit_files, init_repo, patch_file
+        from tests.fixtures import finding
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            init_repo(repo)
+            head = commit_files(repo, {'src/total.py': 'return sum(set(items))\n'})
+            self.fake.pr['head']['sha'] = head
+            cfg = self.cfg | {'auto_fix': True}
+            state = initial_state(sample_run() | {'head_sha': head, 'input_digest': input_digest(self.fake.pr)}, cfg)
+            state.update(phase='fix', next_role='fix', role='fix', calls=3,
+                         fix_paths=['src/total.py'], open_findings=[finding()])
+            whitespace = patch_file() + patch_file('tests/test_credit.py', new=True).replace('+1 @@', '+1,2 @@') + '+\n'
+            mismatch = patch_file().replace('-return sum(set(items))', '-not in the current source')
+            for proposal in (whitespace, mismatch):
+                with self.subTest(proposal=proposal):
+                    next_state = state
+                    for _ in range(2):
+                        next_state = collect_state(next_state, cfg, {'self_hosted': 'success', 'api': 'skipped'},
+                                                   output() | {'patch': proposal}, self.api, repo)
+                        self.assertNotIn('patch', next_state)
+                        if next_state['calls'] == 4:
+                            self.assertEqual(next_state['next_role'], 'fix')
+                            self.assertEqual(next_state['fix_format_feedback']['head_sha'], head)
+                    self.assertEqual(next_state['status'], 'needs_human')
+            self.assertTrue(all(method == 'GET' for method, _, _ in self.fake.requests))
+
     def test_artifact_commit_binds_to_current_run_while_policy_stays_separate(self):
         import json, os
         from runtime.review_guide.pipeline import ci_main
