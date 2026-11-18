@@ -1,24 +1,24 @@
 # 검증 상태
 
-2026-11-16 기준. 파일 설치, 로컬 계약 검사, 실제 모델 호출, 운영 인수는 서로 다른 증거다. 이 문서는 실제 수행한 범위를 기록한다.
+2026-11-18 기준. 파일 설치, 로컬 계약 검사, 실제 모델 호출, 운영 인수는 서로 다른 증거다. 이 문서는 실제 수행한 범위를 기록한다.
 
 | 범위 | 결과 | 증거와 한계 |
 | --- | --- | --- |
 | 독립 설치/업데이트 | 로컬 통과 | source bundle 없는 실행, 사용자 규칙 보존, 3-way 충돌 및 실패 롤백 |
 | 상태·정책·GitHub 경계 | 로컬 통과 | stale base/head/의도, 정확한 패치 tree, 중복 게시/커밋 복구, 승인 원본·권한, zip 경로·digest |
-| 유한 PR/평가 DAG | 정적 검사 통과 | 두 mode의 선택 분기, 수정 후 명시적 검사, actionlint1.7.12; 실제 Actions 미검증 |
+| 유한 PR/평가 DAG | 정적·정상 PR 원격 통과 | 두 mode의 선택 분기와 actionlint1.7.12. 정상 API PR은 3역할 종료 후 미사용 후속 job 생략. 수정 루프·평가 원격은 검증 중 |
 | 합성 Python 인수 | 두 mode 모의 통과 | 실제 Git·Python 테스트 + 가짜 모델/GitHub, 설치→버그→수정·회귀 테스트→새 head 재리뷰→사례→교체 보류 |
 | 평가 정답·판정 | 로컬 통과 | 입력 snapshot 검증, 후보만 자동 생성, 별도 운영자 확정, 서명 변조 거절, 고정 분모·중요 누락 보류 |
 | Codex 구독 smoke | 제한적 실제 성공 | 전용 임시 0.169.0/gpt-6-astra 호출만 확인. 전체 리뷰/서버 운영 증거가 아님 |
 | Codex 파일 권한 canary | 제한적 로컬 성공 | 0.169.0에서 파일·네트워크·권한 상승 거절. 전역 AGENTS 로딩 위험을 발견하여 실행 전 거절. 실제 서버는 bubblewrap 부재로 실패 |
 | 제한된 SSH worker | 로컬 통과 / 실제 서버 needs_verification | 서버 소유 경로·allowlist·버전·deadline·zip 거절, forced-command CLI와 가짜 SSH 종단간 검사. 실제 전용 계정·bubblewrap·키 연결 필요 |
-| GitHub 보호 환경 | 합성 원격 통과 | main dispatch 성공, PR의 기존·신규 workflow 거절. 실제 key는 미등록 |
+| GitHub 보호 환경 | 합성 원격 통과 | main dispatch 성공, PR의 기존·신규 workflow 거절. 보호 환경에 실제 API/App key 등록 후 호출·게시 확인 |
 | Branch protection | 공개 샘플 음성 인수 통과 | private는 Pro 요구403. 공개 샘플의 strict·관리자 적용·전용 App 출처 필수 설정. 실패 ci 및 잘못된 App의 같은 이름 성공 검사로 exact-head 머지 시도 시405 거절 |
 | API 공식 Action 격리 | 합성 원격 통과 | pinned0.169.0, fake key/no prompt. 파일·쓰기·네트워크·root 승격·시작 지침·외부 프로세스 환경/메모리 canary 통과. 실제 모델·키 호출과 구분 |
 | 설치된 테스트 컨테이너 | 합성 원격 통과 | 실제 `test_command`로 호스트·home·Docker socket·환경변수·네트워크·쓰기·UID·capabilities·메모리·프로세스 제한 확인. 모델 호출 없음 |
 | 전용 게시 App | 합성 원격 통과 | 키 재등록 후 인증·토큰 폐기·진행 중 검사·최종 CI/사람/AI 검사·댓글 게시 성공. 위조 성공 검사와 실제 사람 확인 실패를 구분하여 머지 거절 |
 | API 실제 모델 호출 | 제한적 실제 통과 | Codex0.169.0/gpt-6-luna/low, 고정 prompt 응답 검증. 입력10057·출력15 토큰 관측, 보수적 표준 요금 추정 약US$0.0013. 전체 예산US$5; 공급자 hard limit은 미확인. 리뷰 품질 검증과 구분 |
-| 정상/버그/민감 실제 PR | needs_verification | 구독 private / API public 샘플의 원격 PR/head/run/check 증거 필요 |
+| 정상/버그/민감 실제 PR | API 정상 통과 / 나머지 검증 중 | PR12의 bugs/security/verify 지적0, 같은 head의 실제 테스트·App 검사 통과 후 보호 설정 유지하여 머지. 버그·민감 및 구독 경로는 미완료 |
 | 실제 반복 평가·사람 정답 | needs_verification | 합성 판정 fixture를 실제 사용자의 정답 승인으로 취급하지 않음 |
 | 배포·운영 복구 | pending_applicability | 첫 배포 전 기능 차단/롤백/감지 근거를 프로젝트별로 확보 |
 
@@ -43,7 +43,7 @@ python3 scripts/check_workflows.py
 | 조건 | 도구/로컬 증거 | 구독 실제 인수 | API 실제 인수 |
 | --- | --- | --- | --- |
 | 1 설치·사용자 편집 보존 | install 테스트·스킬 행동 검사 통과 | pending | pending |
-| 2 정상 PR·오탐 | acceptance 모의 통과 | pending | pending |
+| 2 정상 PR·오탐 | acceptance 모의 통과 | pending | PR12 정상 사례 1건 지적0 |
 | 3 버그 지적·별도 검증 | acceptance 모의 통과 | pending | pending |
 | 4 수정·회귀 검사·재리뷰 | 실제 Git/Python + 모의 모델 통과 | pending | pending |
 | 5 민감 변경 사람 확인 | policy/lifecycle 테스트 통과 | pending | pending |
@@ -51,7 +51,7 @@ python3 scripts/check_workflows.py
 | 7 후보·사람 정답 | 후보와 서명 경계 통과, 실제 정답 미확정 | pending | pending |
 | 8 동일 문제집·중요 퇴행 보류 | evaluate/eval_runtime 모의 통과 | pending | pending |
 | 9 수정 후 명시적 CI | 생성 DAG + acceptance 모의 통과 | pending | pending |
-| 10 설치·운영 안내 | 두 mode와 SSH 예시 작성 | 서버 선행 조건 미충족 | 키·격리 인수 전 |
+| 10 설치·운영 안내 | 두 mode와 SSH 예시 작성 | 서버 선행 조건 미충족 | 키·격리·정상 PR 인수 확인 |
 | 11 계약·개선 자료 보존 | 공통 실행기·3-way 설치 통과 | pending | pending |
 | 12 과금 fallback 금지 | adapter 실패/모드 검사 통과 | pending | pending |
 
@@ -63,7 +63,7 @@ python3 scripts/check_workflows.py
 
 추가 증거: [게시 환경 main 성공](https://github.com/NyongCho/code-review-guide-sample/actions/runs/43822772399), [게시 환경 PR 차단](https://github.com/NyongCho/code-review-guide-sample/actions/runs/43822653001), [프로세스 경계까지 포함한 API 합성 격리](https://github.com/NyongCho/code-review-guide-sample/actions/runs/43822775874). [독립 구현 검토와 수정](superpowers/reviews/2026-11-16-code-review.md).
 
-[샘플 PR6](https://github.com/NyongCho/code-review-guide-sample/pull/6)에 guide `940587c`를 설치했고, [테스트 컨테이너 canary](https://github.com/NyongCho/code-review-guide-sample/actions/runs/43824609484)의 12개 검사를 통과했다. 진입·모델 설정은 여전히 `needs_verification`이며 실제 모델 호출은 비활성이다. `review-approval`은 main만 허용하고 본인의 명시적 확인을 요구하도록 설정했다. 1인 확인을 독립된 두 사람의 승인으로 간주하지 않는다.
+[샘플 PR6](https://github.com/NyongCho/code-review-guide-sample/pull/6)에 guide `940587c`를 설치했고, [테스트 컨테이너 canary](https://github.com/NyongCho/code-review-guide-sample/actions/runs/43824609484)의 12개 검사를 통과했다. 당시 진입·모델 설정은 `needs_verification`이며 실제 모델 호출은 비활성이었다. 후속 PR10·11에서 별도 검증과 승인 후 활성화했다. `review-approval`은 main만 허용하고 본인의 명시적 확인을 요구하도록 설정했다. 1인 확인을 독립된 두 사람의 승인으로 간주하지 않는다.
 
 [위조 검사 PR7](https://github.com/NyongCho/code-review-guide-sample/pull/7)에서 일반 GitHub Actions App이 `review-guide/ci`·`review-guide/human` 성공을 게시했지만, GitHub는 지정된 App 출처가 아니라며 해당 head의 머지를 HTTP405로 거절했다. [전용 App 토큰 발급 실행](https://github.com/NyongCho/code-review-guide-sample/actions/runs/43825112981)은 키 파싱에 실패했다. 키가 실제로 유효하다는 증거로 Secret 이름의 존재만 사용하지 않는다.
 
@@ -71,6 +71,6 @@ python3 scripts/check_workflows.py
 
 [범위가 지정된 사람 승인](https://github.com/NyongCho/code-review-guide-sample/actions/runs/43828021730) 후 [새 실행](https://github.com/NyongCho/code-review-guide-sample/actions/runs/43881207526)의 필수 CI·human이 성공하여 PR10을 보호 설정 변경 없이 머지했다. 오래된 workflow 재실행의 시간 기준은 `created_at` 대신 `run_started_at`을 쓰도록 수정했다.
 
-[첫 API 연결 검사](https://github.com/NyongCho/code-review-guide-sample/actions/runs/43881747910)는 공식 Action이 자동으로 넣는 `--skip-git-repo-check`를 다시 전달하여 CLI가 추론 전에 중단됐다. [수정 PR11](https://github.com/NyongCho/code-review-guide-sample/pull/11)은 중복 옵션을 제거하고 JSON 사용량 이벤트와 재실행 시간 수정을 포함한다. 실제 모델 응답·사용량은 아직 확보하지 못했다.
+[첫 API 연결 검사](https://github.com/NyongCho/code-review-guide-sample/actions/runs/43881747910)는 공식 Action이 자동으로 넣는 `--skip-git-repo-check`를 다시 전달하여 CLI가 추론 전에 중단됐다. [수정 PR11](https://github.com/NyongCho/code-review-guide-sample/pull/11)은 중복 옵션을 제거하고 JSON 사용량 이벤트와 재실행 시간 수정을 포함한다. 해당 실패 실행들은 추론에 진입하지 않았다.
 
-2026-11-18: 사용자가 PR11의 정확한 커밋을 승인하고 GitHub 처리를 위임했다. [승인 작업](https://github.com/NyongCho/code-review-guide-sample/actions/runs/43882595231)과 [필수 검사](https://github.com/NyongCho/code-review-guide-sample/actions/runs/44217228690) 후 보호 설정 변경 없이 머지했다. [수정된 연결 검사](https://github.com/NyongCho/code-review-guide-sample/actions/runs/44217576459)에서 `{"ok":true}`와 완료 usage event를 확보했다. 표준 [모델 요금](https://developers.openai.com/api/docs/models/gpt-6-luna)에 따라 입력 전체를 cache-write 단가로 잡은 보수적 추정은 US$0.001264625이며 실제 청구서 확인은 아니다. 정상 PR 전체 리뷰는 [PR12](https://github.com/NyongCho/code-review-guide-sample/pull/12)에서 검증 중이다.
+2026-11-18: 사용자가 PR11의 정확한 커밋을 승인하고 GitHub 처리를 위임했다. [승인 작업](https://github.com/NyongCho/code-review-guide-sample/actions/runs/43882595231)과 [필수 검사](https://github.com/NyongCho/code-review-guide-sample/actions/runs/44217228690) 후 보호 설정 변경 없이 머지했다. [수정된 연결 검사](https://github.com/NyongCho/code-review-guide-sample/actions/runs/44217576459)에서 `{"ok":true}`와 완료 usage event를 확보했다. 표준 [모델 요금](https://developers.openai.com/api/docs/models/gpt-6-luna)에 따라 입력 전체를 cache-write 단가로 잡은 보수적 추정은 US$0.001264625이며 실제 청구서 확인은 아니다. [정상 PR12](https://github.com/NyongCho/code-review-guide-sample/pull/12)의 [실제 리뷰](https://github.com/NyongCho/code-review-guide-sample/actions/runs/44217789445)는 bugs/security/verify의 새 세션 3회, 지적0, `status=verified`로 완료됐다. 테스트·검토 head가 `c231abfe3ee049424daf7cffb837424c1ae4974a`로 일치했고, 전용 App의 CI·human 성공 후 보호 설정 변경 없이 머지했다. 3회 리뷰 사용량까지 포함한 누적 보수 추정은 US$0.023324375다. 이 한 사례는 일반적인 오탐률을 입증하지 않는다.
