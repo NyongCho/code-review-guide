@@ -18,7 +18,7 @@
 | 설치된 테스트 컨테이너 | 합성 원격 통과 | 실제 `test_command`로 호스트·home·Docker socket·환경변수·네트워크·쓰기·UID·capabilities·메모리·프로세스 제한 확인. 모델 호출 없음 |
 | 전용 게시 App | 합성 원격 통과 | 키 재등록 후 인증·토큰 폐기·진행 중 검사·최종 CI/사람/AI 검사·댓글 게시 성공. 위조 성공 검사와 실제 사람 확인 실패를 구분하여 머지 거절 |
 | API 실제 모델 호출 | 제한적 실제 통과 | Codex0.169.0/gpt-6-luna/low, 고정 prompt 응답 검증. 입력10057·출력15 토큰 관측, 보수적 표준 요금 추정 약US$0.0013. 전체 예산US$5; 공급자 hard limit은 미확인. 리뷰 품질 검증과 구분 |
-| 정상/버그/민감 실제 PR | API 정상·버그 검출 확인 / 자동 수정 검증 중 | PR12의 bugs/security/verify 지적0, 같은 head의 실제 테스트·App 검사 통과 후 보호 설정 유지하여 머지. PR13에서 버그 확인. 운영자 복구 커밋의 테스트·재리뷰 통과. PR17은 자동 수정 커밋 게시까지 확인했다. 같은 실행에서의 수정 후 재리뷰·민감 PR·구독 경로는 미완료 |
+| 정상/버그/민감 실제 PR | API 정상·버그 검출 확인 / 자동 수정 검증 중 | PR12의 bugs/security/verify 지적0, 같은 head의 실제 테스트·App 검사 통과 후 보호 설정 유지하여 머지. PR13에서 버그 확인. 운영자 복구 커밋의 테스트·재리뷰 통과. PR19는 자동 수정 커밋을 게시한 같은 실행에서 새 커밋의 CI 실패를 감지했다. 같은 실행에서의 새 커밋 검증 성공·민감 PR·구독 경로는 미완료 |
 | 실제 반복 평가·사람 정답 | needs_verification | 합성 판정 fixture를 실제 사용자의 정답 승인으로 취급하지 않음 |
 | 배포·운영 복구 | pending_applicability | 첫 배포 전 기능 차단/롤백/감지 근거를 프로젝트별로 확보 |
 
@@ -100,3 +100,7 @@ PR13은 검증한 복구 커밋으로 병합됐다(`9665c88`). main과의 최종
 PR18은 최종 `1b162b0`에 대한 사람 승인과 세 필수 검사를 통과해 샘플 main에 `d3ea88a`로 병합됐다. 다음 재조회 간격보다 남은 시간이 짧으면 중단하는 동작은 [재현 결과와 운영 판단](https://github.com/NyongCho/code-review-guide-sample/pull/18#issuecomment-6969860930)에 기록했다. [PR19 첫 시도](https://github.com/NyongCho/code-review-guide-sample/actions/runs/44243739228/attempts/1)는 수정 코드와 회귀 테스트를 생성했지만 새 테스트 끝의 빈 줄이 Git 공백 검사를 통과하지 못해 게시 전에 중단됐다. 가이드에서는 원본 패치를 재생해 같은 커밋에서 재작성 한 번, 같은 오류 반복 시 사람 확인, 원격 쓰기 0건을 검증했다.
 
 [같은 입력 재실행](https://github.com/NyongCho/code-review-guide-sample/actions/runs/44243739228/attempts/2)에서는 모델이 `source/src/total.py`를 제안해 허용 경로 검사에서 멈췄다. 이어서 운영자가 커밋 메시지에 정확한 소스 경로·새 테스트 경로·기대값을 명시했다. [해당 실행](https://github.com/NyongCho/code-review-guide-sample/actions/runs/44245674687)은 새 파일 대신 기존 테스트 파일에 메서드를 추가해서 보호 규칙에 따라 멈췄다. 두 제안 모두 게시되지 않았다. 가이드의 수정 모델 지침에 저장소 경로 표기 예시와 기존 테스트 파일의 추가 편집도 사람 확인 대상임을 명시했다.
+
+[PR20](https://github.com/NyongCho/code-review-guide-sample/pull/20)은 `0bdada9`에 대한 사람 승인과 세 필수 검사를 통과해 샘플 main에 `b06299b`로 병합됐다. [PR19 재검증](https://github.com/NyongCho/code-review-guide-sample/actions/runs/44248763444)은 이전과 동일한 크레딧 오류 및 테스트 요구사항을 사용했다. 모델이 소스 수정과 새 테스트를 작성해 `86a7565`로 자동 게시했다. Git은 7줄짜리 테스트의 헤더에 적힌 6줄만 적용했다. 같은 실행에서 해당 커밋의 CI가 실패했고 실행기는 `needs_human`으로 종료했다.
+
+[운영자 복구 커밋](https://github.com/NyongCho/code-review-guide-sample/commit/a6102695ce4bf0b4f5f322c85222453755ced683)은 모델 원본에서 빠진 마지막 검증문 한 줄을 복원했다. 새 테스트는 오류 코드에서 100과 75의 차이로 실패했고 수정 후 전체 4개가 통과했다. 가이드에서 실제 모델 출력을 재생한 결과, 헤더 뒤에 남은 변경 줄을 게시 전에 발견해 한 번 재작성을 요청했다. 같은 오류가 반복되면 중단했고, 헤더의 줄 수만 7로 바로잡은 응답은 복구 커밋과 동일한 Git 트리를 만들었다.

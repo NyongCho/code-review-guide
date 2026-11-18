@@ -20,6 +20,20 @@ class PolicyTests(unittest.TestCase):
         patch = patch_file() + patch_file("tests/test_total.py", new=True)
         self.assertEqual(check_patch(patch, self.run, self.cfg, None)["status"], "verified")
 
+    def test_extra_change_lines_after_declared_hunk_require_correction(self):
+        for extra in ("+assert total([100, -25]) == 75", "-omitted deletion"):
+            with self.subTest(extra=extra):
+                patch = patch_file() + extra + "\n"
+                result = check_patch(patch, self.run, self.cfg, None)
+                self.assertIn("format_feedback", result)
+                self.assertEqual(result["paths"], [])
+
+    def test_consecutive_unified_file_headers_and_no_newline_marker(self):
+        first = patch_file().partition("\n")[2] + "\\ No newline at end of file\n"
+        second = patch_file("src/second.py").partition("\n")[2]
+        run = self.run | {"fix_paths": ["src/total.py", "src/second.py"]}
+        self.assertEqual(check_patch(first + second, run, self.cfg, None)["status"], "verified")
+
     def test_sensitive_policy_and_existing_tests_need_human(self):
         for path in ("auth/login.py", ".review/config.json", "tests/test_total.py", "src/unrelated.py"):
             with self.subTest(path=path):
