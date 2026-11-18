@@ -180,6 +180,12 @@ class PatchTests(unittest.TestCase):
             head = commit_files(repo, {'src/total.py': 'return sum(set(items))\n'})
             fixed = commit_files(repo, {'src/total.py': 'return sum(items)\n'})
             expected_tree = git(repo, 'rev-parse', fixed + '^{tree}')
+            # Actions fetches the PR SHA into FETCH_HEAD in a shallow policy checkout.
+            runner = Path(tmp)/'trusted'
+            git(Path(tmp), 'clone', '--depth=1', repo.as_uri(), str(runner))
+            git(runner, 'checkout', '--detach')
+            git(runner, 'fetch', '--depth=1', 'origin', head)
+            repo = runner
             current = pr(); current['base']['sha'] = current['head']['sha'] = head
             run = sample_run() | {'base_sha': head, 'head_sha': head, 'input_digest': input_digest(current),
                                   'intent': {'head_commit_message':'Count every item; preserve duplicates'}, 'fix_paths': ['src/total.py'], 'created_at': '2026-11-16T00:00:00Z'}
