@@ -128,7 +128,7 @@ class AcceptanceTests(unittest.TestCase):
                 regression='import unittest\nfrom src.total import total_cents\n\nclass DuplicateTests(unittest.TestCase):\n    def test_duplicates(self):\n        self.assertEqual(total_cents([100, 100]), 200)\n'
                 edits = [
                     {'path': 'src/total.py', 'operation': 'replace', 'content': 'def total_cents(items: list[int]) -> int:\n    return sum(items)\n'},
-                    {'path': 'tests/test_duplicates.py', 'operation': 'create', 'content': regression},
+                    {'path': 'tests/test_중복.py', 'operation': 'create', 'content': regression},
                 ]
                 fix_state=copy.deepcopy(state)
                 state=collect_state(state,cfg,outcomes,model(file_proposal() | {'edits': edits}),api,repo)

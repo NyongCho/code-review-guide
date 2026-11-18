@@ -39,6 +39,12 @@ class PolicyTests(unittest.TestCase):
             with self.subTest(path=path):
                 self.assertEqual(check_patch(patch_file(path), self.run, self.cfg, None)["status"], "needs_human")
 
+    def test_colocated_existing_tests_need_human_even_when_named_in_findings(self):
+        for path in ("src/test_total.py", "src/total_test.go", "src/total.test.ts", "src/__tests__/total.ts"):
+            with self.subTest(path=path):
+                run = self.run | {"fix_paths": [path]}
+                self.assertEqual(check_patch(patch_file(path), run, self.cfg, None)["status"], "needs_human")
+
     def test_unsafe_and_symlink_patch_cannot_be_applied(self):
         for patch in (patch_file("../../outside"), patch_file("/tmp/outside"),
                       patch_file(new=True).replace("100644", "120000")):
