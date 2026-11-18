@@ -106,7 +106,24 @@ class LifecycleTests(unittest.TestCase):
         if not self.state['terminal']:
             self.event('model_result',role='verify',result=output()|{'dispositions':[{'id':finding()['id'],'decision':'dismissed','reason':'Duplicate total is expected'}]})
         self.assertEqual(self.state['status'],'incomplete')
-        self.assertIn('identity',self.state['reason'])
+        self.assertIn('omitted',self.state['reason'])
+
+    def test_colliding_review_ids_reach_verifier_as_separate_findings(self):
+        bug = finding()
+        security = bug | {'evidence': 'Independent evidence for the repeated amount bug'}
+        self.event('model_result', role='bugs', result=output([bug]))
+        self.event('model_result', role='security', result=output([security]))
+        self.assertEqual(self.state['next_role'], 'verify')
+        original = self.state['candidates']['bugs'][0]
+        duplicate = self.state['candidates']['security'][0]
+        self.assertNotEqual(original['id'], duplicate['id'])
+        self.assertEqual(duplicate['evidence'], security['evidence'])
+        self.assertEqual(security['id'], bug['id'])
+        self.event('model_result', role='verify', result=output([original]) | {'dispositions': [
+            {'id': original['id'], 'decision': 'confirmed', 'reason': 'Reproduced'},
+            {'id': duplicate['id'], 'decision': 'dismissed', 'reason': 'Same defect as the confirmed finding'},
+        ]})
+        self.assertEqual(self.state['next_role'], 'fix')
 
     def test_observe_does_not_hide_failure(self):
         self.event("tests_result", passed=True)
