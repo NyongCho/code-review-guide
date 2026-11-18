@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from runtime.review_guide.cases import OperatorDecision, confirm_case, materialize_case, propose_case
 from runtime.review_guide.codex import build_request, normalize_action, run_codex
@@ -147,7 +148,8 @@ class AcceptanceTests(unittest.TestCase):
                 cases=[]
                 for name,origin,record,answers in (('bug',candidate,bug_case,[issue]),('clean',clean_candidate,clean_case,[])):
                     decision=OperatorDecision('fixture operator','2026-11-16T00:00:00Z',record['input_digest'],'synthetic test only',answers,bool(answers),'holdout')
-                    cases.append(confirm_case(origin,decision,root/name))
+                    with patch.dict(os.environ, {'GITHUB_ACTIONS': 'false', 'REVIEW_WORKER': ''}):
+                        cases.append(confirm_case(origin,decision,root/name))
                     materialize_case(root/name,root/(name+'-worker'))
                 configs=[cfg|{'model':m,'tools_digest':digest('fixture tools'),'rules_digest':digest('fixture rules')} for m in ('fixture-incumbent','fixture-candidate')]
                 rubric={'version':1,'critical_trials':3}

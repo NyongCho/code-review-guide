@@ -1,6 +1,7 @@
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 from runtime.review_guide.cases import propose_case, confirm_case, materialize_case, OperatorDecision
 from runtime.review_guide.contracts import ValidationError
@@ -53,7 +54,8 @@ class CaseTests(unittest.TestCase):
         decision = OperatorDecision('operator', '2026-11-16T00:00:00Z', case['input_digest'],
                                     'Synthetic fixture decision', [finding() | {'evidence':'ANSWER_CANARY_ONLY'}], True, 'holdout')
         confirmed = self.root/'confirmed'
-        result = confirm_case(self.candidate, decision, confirmed)
+        with patch.dict('os.environ', {'GITHUB_ACTIONS': 'false', 'REVIEW_WORKER': ''}):
+            result = confirm_case(self.candidate, decision, confirmed)
         self.assertEqual(result['status'], 'confirmed')
         worker = self.root/'worker'
         materialize_case(confirmed, worker)
@@ -65,12 +67,12 @@ class CaseTests(unittest.TestCase):
         self.assertNotIn(self.run['repository'], (worker/'context.json').read_text())
 
     def test_changed_confirmed_input_and_worker_confirmation_are_blocked(self):
-        from unittest.mock import patch
         case = propose_case(self.run, self.snapshot, self.candidate)
         decision = OperatorDecision('operator','2026-11-16T00:00:00Z',case['input_digest'],'reason',[],False,'holdout')
         with patch.dict('os.environ', {'GITHUB_ACTIONS':'true'}):
             with self.assertRaises(ValidationError): confirm_case(self.candidate, decision, self.root/'bad')
-        confirm_case(self.candidate, decision, self.root/'confirmed')
+        with patch.dict('os.environ', {'GITHUB_ACTIONS': 'false', 'REVIEW_WORKER': ''}):
+            confirm_case(self.candidate, decision, self.root/'confirmed')
         (self.root/'confirmed/input/source/src/total.py').write_text('tampered')
         with self.assertRaises(ValidationError): materialize_case(self.root/'confirmed', self.root/'worker')
 
