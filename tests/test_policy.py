@@ -21,7 +21,7 @@ class PolicyTests(unittest.TestCase):
         self.assertEqual(check_patch(patch, self.run, self.cfg, None)["status"], "verified")
 
     def test_extra_change_lines_after_declared_hunk_require_correction(self):
-        for extra in ("+assert total([100, -25]) == 75", "-omitted deletion"):
+        for extra in ("+assert total([100, -25]) == 75", "\n+assert total([]) == 0", "-omitted deletion"):
             with self.subTest(extra=extra):
                 patch = patch_file() + extra + "\n"
                 result = check_patch(patch, self.run, self.cfg, None)
