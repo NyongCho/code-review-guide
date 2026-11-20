@@ -114,3 +114,7 @@ PR18은 최종 `1b162b0`에 대한 사람 승인과 세 필수 검사를 통과�
 [PR22 형식 요건을 명시한 실행](https://github.com/NyongCho/code-review-guide-sample/actions/runs/44257293509)은 소스와 테스트를 그대로 두고 커밋 메시지에 JSON 패치의 마지막 줄바꿈 요건만 추가했다. 이번에는 마지막 줄바꿈을 포함했지만, 새 테스트의 7줄을 6줄로 선언한 채 재작성을 마쳤다. 실행기는 모델 호출 5회 후 `needs_human`으로 종료했고 PR head는 `b950ee8`로 유지됐다. 별도 임시 저장소에서 최종 제안의 헤더 숫자만 6에서 7로 변경하면 전체 테스트 4개가 통과했다. 같은 테스트와 원래 구현의 조합에서는 100과 75의 차이로 실패했다. #22에서 자동 게시 및 새 커밋 재리뷰는 실행되지 않았다.
 
 #22 커밋 `b950ee8`에 보관된 최종 응답에서 소스와 새 테스트의 내용을 꺼내 파일 단위 제안으로 재생했다. 원래 코드에서는 마지막 검증문이 `100 != 75`로 실패했다. 로컬 Git과 GitHub 응답 대역으로 게시한 커밋에는 테스트 7줄이 모두 들어갔고 전체 테스트 4개가 통과했다. API·자체 서버 수용 테스트는 두 방식 모두 수정 커밋과 같은 SHA의 테스트·재리뷰를 확인한다. 이 수용 테스트의 모델 응답은 고정된 입력이다.
+
+샘플 #23은 파일 내용으로 Git 패치를 생성하는 실행기를 설치했다. 최종 커밋 `67f89f7`에서 테스트와 버그·보안·최종 리뷰가 같은 SHA를 확인했고 지적은 0건이었다. 사람 승인과 필수 검사 세 개를 확인한 뒤 `b4b2348`로 병합했다. [PR #23](https://github.com/NyongCho/code-review-guide-sample/pull/23) · [최종 커밋의 첫 리뷰](https://github.com/NyongCho/code-review-guide-sample/actions/runs/44263408251/attempts/1)
+
+같은 커밋의 승인 후 재실행에서는 GitHub 러너의 Node 경로가 `24.22.2`에서 `24.22.3`으로 바뀌어 Codex가 샌드박스 안에서 파일을 읽을 수 없었다. 해당 실행의 AI 결과는 `incomplete`였다. 실제 모델 호출 없이 새 경로에서 같은 Codex 바이너리의 SHA-256과 격리 검사 12개를 확인했다. [승인 후 재실행](https://github.com/NyongCho/code-review-guide-sample/actions/runs/44263408251/attempts/2) · [격리 검사](https://github.com/NyongCho/code-review-guide-sample/actions/runs/44658524025)
