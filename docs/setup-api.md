@@ -30,3 +30,5 @@ prepare 단계가 profile을 `/home/runner/review-home/config.toml`로 복사하
 검사 후 `.review/config.json`의 `isolation.status`와 `entry_isolation.status`를 `verified`로 갱신한다. 진입 환경/ref 제한과 테스트 컨테이너 격리까지 확인해야 `entry_isolation`을 올릴 수 있다. [전용 검사 게시 App](setup-publisher.md)의 ID·필수 검사 출처·엄격한 최신 branch 요구를 함께 설정한다. 그 다음 환경 secret `OPENAI_API_KEY`를 등록하고 작은 정상 PR부터 명시적으로 실행한다.
 
 OpenAI 프로젝트의 Limits → Spend에서 **Enforce a hard limit**를 설정할 수 있다. 알림만 설정하는 것과 구분한다. 집행 지연으로 소액 초과가 가능하므로 승인 예산보다 낮은 한도와 여유분을 두고, 실제 호출을 직렬로 확인한다. 다른 작업이 함께 쓰는 프로젝트의 총사용량도 포함한다. [공식 비용 제한 안내](https://developers.openai.com/api/docs/guides/spend-limits)
+
+GitHub 호스팅 러너의 Node 패치 버전은 같은 workflow 안에서도 달라질 수 있다. Linux x64에서 Codex를 고정 경로에 설치하려면 격리 검사를 할 때 `NPM_CONFIG_PREFIX=/home/runner/review-tools`를 설정하고, 공식 Action 실행 전에 `/home/runner/review-tools/bin`을 `GITHUB_PATH`에 추가한다. 검사에서 생성한 profile과 report를 함께 설치하면 리뷰와 평가 작업이 같은 설치 위치를 사용한다. 샘플에서는 Node 24.22.2와 24.22.3 각각에서 Codex 0.169.0의 바이너리 해시와 격리 검사 12개를 확인했다. [두 버전의 격리 검사](https://github.com/NyongCho/code-review-guide-sample/actions/runs/44661014632)

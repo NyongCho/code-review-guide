@@ -16,6 +16,28 @@ class PipelineTests(unittest.TestCase):
         self.api = GitHub('unused', self.fake)
         self.state = initial_state(sample_run() | {'input_digest': input_digest(pr())}, self.cfg)
 
+    def test_verified_profile_selects_the_fixed_hosted_install_layout(self):
+        import os
+        from runtime.review_guide.pipeline import prepare_api_home
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / 'source'
+            source.mkdir()
+            (source / 'isolation.json').write_text('{}')
+            env_file, path_file = root / 'env', root / 'path'
+            binary = 'lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/bin/codex'
+            with patch.dict(os.environ, {'GITHUB_ENV': str(env_file), 'GITHUB_PATH': str(path_file)}):
+                for name, prefix in [('legacy', '/opt/hostedtoolcache/node/24.22.2/x64'), ('fixed', '/home/runner/review-tools')]:
+                    policy = '[permissions.review.filesystem]\n"' + prefix + '/' + binary + '"="read"\n'
+                    (source / 'config.toml').write_text(policy)
+                    prepare_api_home(source, root / name)
+                    self.assertEqual((root / name / 'config.toml').read_text(), policy)
+                    self.assertTrue((root / name / 'isolation.json').is_file())
+                    if name == 'legacy':
+                        self.assertFalse(env_file.exists() or path_file.exists())
+            self.assertEqual(env_file.read_text(), 'NPM_CONFIG_PREFIX=/home/runner/review-tools\n')
+            self.assertEqual(path_file.read_text(), '/home/runner/review-tools/bin\n')
+
     def test_unverified_entry_isolation_blocks_all_model_calls_but_preserves_ci(self):
         state = inspect_state(self.state, self.cfg, {'status': 'passed', 'head_sha': self.state['head_sha']}, self.api)
         self.assertTrue(state['terminal'])
