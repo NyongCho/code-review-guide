@@ -1,12 +1,12 @@
 # 검증 상태
 
-2026-11-18 기준. 파일 설치, 로컬 계약 검사, 실제 모델 호출, 운영 인수는 서로 다른 증거다. 이 문서는 실제 수행한 범위를 기록한다.
+2026-11-23 기준. 파일 설치, 로컬 계약 검사, 실제 모델 호출, 운영 인수는 서로 다른 증거다. 이 문서는 실제 수행한 범위를 기록한다.
 
 | 범위 | 결과 | 증거와 한계 |
 | --- | --- | --- |
 | 독립 설치/업데이트 | 로컬 통과 | source bundle 없는 실행, 사용자 규칙 보존, 3-way 충돌 및 실패 롤백 |
 | 상태·정책·GitHub 경계 | 로컬 통과 | stale base/head/의도, 정확한 패치 tree, 중복 게시/커밋 복구, 승인 원본·권한, zip 경로·digest |
-| 유한 PR/평가 DAG | 정적·정상 PR 원격 통과 | 두 mode의 선택 분기와 actionlint1.7.12. 정상 API PR은 3역할 종료 후 미사용 후속 job 생략. 수정 루프·평가 원격은 검증 중 |
+| 유한 PR/평가 DAG | API PR 흐름 원격 통과 | 정상 PR은 미사용 후속 job을 생략했다. #22는 같은 실행에서 자동 수정 후 같은 SHA의 테스트와 세 역할 재리뷰를 완료했다. 평가 DAG의 원격 검증은 남아 있다. |
 | 합성 Python 인수 | 두 mode 모의 통과 | 실제 Git·Python 테스트 + 가짜 모델/GitHub, 설치→버그→수정·회귀 테스트→새 head 재리뷰→사례→교체 보류 |
 | 평가 정답·판정 | 로컬 통과 | 입력 snapshot 검증, 후보만 자동 생성, 별도 운영자 확정, 서명 변조 거절, 고정 분모·중요 누락 보류 |
 | Codex 구독 smoke | 제한적 실제 성공 | 전용 임시 0.169.0/gpt-6-astra 호출만 확인. 전체 리뷰/서버 운영 증거가 아님 |
@@ -18,7 +18,7 @@
 | 설치된 테스트 컨테이너 | 합성 원격 통과 | 실제 `test_command`로 호스트·home·Docker socket·환경변수·네트워크·쓰기·UID·capabilities·메모리·프로세스 제한 확인. 모델 호출 없음 |
 | 전용 게시 App | 합성 원격 통과 | 키 재등록 후 인증·토큰 폐기·진행 중 검사·최종 CI/사람/AI 검사·댓글 게시 성공. 위조 성공 검사와 실제 사람 확인 실패를 구분하여 머지 거절 |
 | API 실제 모델 호출 | 제한적 실제 통과 | Codex0.169.0/gpt-6-luna/low, 고정 prompt 응답 검증. 입력10057·출력15 토큰 관측, 보수적 표준 요금 추정 약US$0.0013. 전체 예산US$5; 공급자 hard limit은 미확인. 리뷰 품질 검증과 구분 |
-| 정상/버그/민감 실제 PR | API 정상·버그 검출 확인 / 자동 수정 검증 중 | PR12의 bugs/security/verify 지적0, 같은 head의 실제 테스트·App 검사 통과 후 보호 설정 유지하여 머지. PR13에서 버그 확인. 운영자 복구 커밋의 테스트·재리뷰 통과. PR19는 자동 게시 후 같은 실행에서 CI 실패를 감지했다. PR22는 잘린 패치를 게시 전에 차단하고 한 번 재작성을 요청했다. 같은 실행에서의 새 커밋 검증 성공·민감 PR·구독 경로는 미완료 |
+| 정상/버그/민감 실제 PR | API 정상·버그 검출·자동 수정 사례 통과 | #12에서 정상 변경을 확인했다. #22는 테스트 파일과 기대값을 명시한 사례에서 소스와 회귀 테스트를 함께 게시했다. 일반적인 요청에서는 테스트 누락도 관측했다. 민감 PR과 구독 경로의 종단 간 검증은 남아 있다. |
 | 실제 반복 평가·사람 정답 | needs_verification | 합성 판정 fixture를 실제 사용자의 정답 승인으로 취급하지 않음 |
 | 배포·운영 복구 | pending_applicability | 첫 배포 전 기능 차단/롤백/감지 근거를 프로젝트별로 확보 |
 
@@ -45,7 +45,7 @@ python3 scripts/check_workflows.py
 | 1 설치·사용자 편집 보존 | install 테스트·스킬 행동 검사 통과 | pending | pending |
 | 2 정상 PR·오탐 | acceptance 모의 통과 | pending | PR12 정상 사례 1건 지적0 |
 | 3 버그 지적·별도 검증 | acceptance 모의 통과 | pending | PR13 재실행에서 중복 금액 버그를 검출하고 별도 검증자가 확정 |
-| 4 수정·회귀 검사·재리뷰 | 실제 Git/Python + 모의 모델 통과 | pending | PR13 모델 작성 패치를 운영자가 보정·게시한 뒤 통과. 자동 게시 미검증 |
+| 4 수정·회귀 검사·재리뷰 | 실제 Git/Python + 모의 모델 통과 | pending | #22에서 소스와 새 테스트를 자동 게시하고 같은 실행에서 수정 SHA의 테스트·재리뷰를 완료했다. 새 테스트는 원본에서 실패하고 수정 후 통과했다. |
 | 5 민감 변경 사람 확인 | policy/lifecycle 테스트 통과 | pending | pending |
 | 6 중복·stale·상한·실패 | lifecycle/GitHub/adapter 테스트 통과 | pending | pending |
 | 7 후보·사람 정답 | 후보와 서명 경계 통과, 실제 정답 미확정 | pending | pending |
@@ -120,3 +120,9 @@ PR18은 최종 `1b162b0`에 대한 사람 승인과 세 필수 검사를 통과�
 같은 커밋의 승인 후 재실행에서는 GitHub 러너의 Node 경로가 `24.22.2`에서 `24.22.3`으로 바뀌어 Codex가 샌드박스 안에서 파일을 읽을 수 없었다. 해당 실행의 AI 결과는 `incomplete`였다. 실제 모델 호출 없이 새 경로에서 같은 Codex 바이너리의 SHA-256과 격리 검사 12개를 확인했다. [승인 후 재실행](https://github.com/NyongCho/code-review-guide-sample/actions/runs/44263408251/attempts/2) · [격리 검사](https://github.com/NyongCho/code-review-guide-sample/actions/runs/44658524025)
 
 샘플 #24는 사람 승인과 세 필수 검사를 통과해 `c00ef93`으로 병합됐다. #22의 `6ceccc0`에서 두 번 실행한 결과, 첫 버그 리뷰가 배정된 러너는 두 번 모두 이전 Node 경로를 사용했다. AI 상태는 `incomplete`였고 수정 커밋은 생기지 않았다. 별도의 무료 검사에서는 두 Node 버전 모두 `/home/runner/review-tools` 아래 같은 Codex 실행 파일로 12개 격리 검사를 통과했다. [PR #24](https://github.com/NyongCho/code-review-guide-sample/pull/24) · [#22 첫 실행](https://github.com/NyongCho/code-review-guide-sample/actions/runs/44660066709/attempts/1) · [#22 재실행](https://github.com/NyongCho/code-review-guide-sample/actions/runs/44660066709/attempts/2) · [고정 경로 검증](https://github.com/NyongCho/code-review-guide-sample/actions/runs/44661014632)
+
+샘플 #25의 승인 대상 `d194563`은 버그·보안·최종 리뷰에서 지적 0건을 기록했다. 필수 검사 세 개를 통과해 `07a5115`로 병합했다. 이 버전부터 샘플의 API 리뷰는 Codex를 고정된 npm 설치 경로에서 실행한다. [PR #25](https://github.com/NyongCho/code-review-guide-sample/pull/25) · [승인 후 검사](https://github.com/NyongCho/code-review-guide-sample/actions/runs/44661410794/attempts/2)
+
+#22에서 `c382a35`의 기존 테스트 3개는 통과했지만, 모델이 음수 금액 누락을 발견하고 검증자가 확인했다. 같은 실행에서 수정 커밋 `ed9270f`를 게시하고 해당 SHA의 테스트와 버그·보안·최종 리뷰를 마쳤다. 실행 상태는 `verified`였다. 수정 커밋에는 소스 한 줄만 포함됐고, 재리뷰도 명시적으로 요청한 새 회귀 테스트가 빠진 점을 놓쳤다. [자동 수정과 재리뷰](https://github.com/NyongCho/code-review-guide-sample/actions/runs/45131433430) · [게시된 커밋](https://github.com/NyongCho/code-review-guide-sample/commit/ed9270f724490d2fcec3a8d3c992734a64546dcc)
+
+#22의 다음 검증에서는 같은 소스 트리를 사용하고, 커밋 메시지에 새 파일 `tests/test_signed_credit.py`와 기대값 `total_cents([100, -25]) == 75`를 인수 조건으로 명시했다. 모델이 계산 오류와 테스트 누락을 각각 지적했고 `bfe2959`에서 소스와 테스트를 함께 고친 `f3ffc18`을 자동 게시했다. 같은 실행에서 해당 SHA의 컨테이너 테스트와 버그·보안·최종 리뷰까지 끝났다. 모델 호출은 총 7회였고 최종 상태는 `verified`, 미해결 지적은 0건이었다. 격리 환경에서 새 테스트를 원래 코드에 적용하면 `100 != 75`로 실패했고, 수정 코드에서는 전체 테스트 4개가 통과했다. 샘플 PR은 병합하지 않았다. 사람 승인은 별도 검사로 남아 있다. [#22 실행 기록](https://github.com/NyongCho/code-review-guide-sample/actions/runs/45132954087) · [자동 수정 커밋](https://github.com/NyongCho/code-review-guide-sample/commit/f3ffc1809c720bcc9d84d5c3441859ba0f5bda2f)
