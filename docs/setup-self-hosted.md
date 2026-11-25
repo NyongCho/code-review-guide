@@ -16,7 +16,10 @@ Linux 관리자와 구독 계정 소유자가 다음을 준비한다. 아래 경
 2. `review-worker` 전용 OS 계정을 만들고 sudo·Docker socket·개인 자료 접근 권한을 주지 않는다. `/var/lib/review-worker/work`와 `/var/lib/review-worker/codex-home`은 해당 계정 소유, 0700으로 만든다.
 3. 이 guide의 검토한 `runtime/`을 root 소유 `/opt/review-guide/runtime/`에 배치한다. 고정 Codex 실행 파일과 운영 설정도 PR 입력 밖, root가 관리하는 경로에 둔다.
 4. Codex 0.169.0의 [공식 Linux release](https://github.com/openai/codex/releases/tag/rust-v0.169.0)를 전용 경로에 설치한다. x86_64 musl tar.gz SHA-256은 `9af4d751fce183faedea629437d5252dbf458eeb04130cf4f97be844621ea985`, native binary SHA-256은 `b452ca20f838a8855a88a41050ee4a694033fff4ea3ecdad5633e6e0e8d13f2b`이다. 기존 전역 CLI는 교체할 필요가 없다.
+   같은 릴리스의 `codex-code-mode-host-x86_64-unknown-linux-musl.tar.gz`도 내려받는다. 압축 파일의 SHA-256은 `cbed6a8d25e8268792b757767fbc76d4c62e84bcf8ee4a63f97547f0de3aaceb`이다. 압축을 풀고 실행 파일을 고정 CLI와 같은 디렉터리에 `codex-code-mode-host`라는 이름으로 설치한다(root 소유, 0755). 이 도구가 빠지면 로그인과 버전 확인은 성공해도 모델이 diff를 열 수 없어 리뷰가 `incomplete`로 끝날 수 있다.
 5. 해당 계정과 전용 `CODEX_HOME`으로 고정 CLI의 `login --help`를 확인하고 본인이 로그인한다. 개인 auth 파일을 복사하지 않는다. `HOME`도 전용 home으로 지정한다.
+
+Ubuntu 24.04에서 격리 검사가 `bwrap: loopback: Failed RTM_NEWADDR`로 실패하면 커널 로그에서 AppArmor가 `bwrap`을 거절했는지 확인한다. 검증 서버에서는 배포판의 `apparmor-profiles` 패키지가 제공하는 `bwrap-userns-restrict` 프로필로 해결했다. 이 프로필은 호스트의 `/usr/bin/bwrap` 호출에 적용되므로 다른 사용처를 확인하고, 임시 로드 상태에서 전용 계정의 격리 검사를 통과한 뒤 영구 적용한다.
 
 전용 home의 `config.toml` 예시는 다음과 같다. 필요한 바이너리 읽기 경로는 실제 설치 위치와 일치해야 한다.
 
@@ -56,4 +59,4 @@ GitHub Environment `review-runtime`의 배포 branch는 **main만** 허용한다
 
 상주 worker 재시작 명령은 없다. 다음 SSH 요청이 새 프로세스를 시작한다. `work/worker.lock`은 동시 요청을 직렬화하며 기다리는 시간도 run deadline에 포함된다. 정상 종료·예외·연결 중단 시 만든 input을 제거한다. 강제 종료나 전원 장애로 `active-input`이 남으면 다음 요청은 실행을 거절한다.
 
-운영자가 실행 중인 worker/Codex가 없는지 확인한 뒤 잔여 입력을 조사하고 제거한다. 잠금 파일을 삭제해서 실행 중인 작업을 우회하지 않는다. raw stdout/stderr는 Actions 로그에 출력하지 않으며 실패는 정규화된 상태로 남긴다. 현재 실제 서버는 bubblewrap과 전용 계정 설정이 준비되지 않아 `needs_verification`이다.
+운영자가 실행 중인 worker/Codex가 없는지 확인한 뒤 잔여 입력을 조사하고 제거한다. 잠금 파일을 삭제해서 실행 중인 작업을 우회하지 않는다. raw stdout/stderr는 Actions 로그에 출력하지 않으며 실패는 정규화된 상태로 남긴다.

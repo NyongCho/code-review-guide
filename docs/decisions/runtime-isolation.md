@@ -27,6 +27,14 @@
 
 최초 probe는 native executable 경로를 허용하지 않아 sandbox 내부 실행에 실패했다. 최소 OS 경로와 고정 native 실행 파일 경로를 읽기 허용한 다음 파일 경계 검사가 통과했다. 이후 네트워크·권한 상승·지침 probe를 추가했다. 임시 파일은 제거했고 실제 인증이나 API 호출을 사용하지 않았다. 이 결과로 runtime 전체를 `verified`로 올리지 않는다.
 
+## 구독 worker의 실제 검증 (2026-11-25)
+
+Ubuntu 24.04의 전용 계정에서 Codex 0.169.0과 배포판의 bubblewrap 프로필을 사용했다. 격리 안에서 합성 입력 읽기는 성공했고, 입력 밖 파일 읽기와 작업 디렉터리 쓰기 및 네트워크 연결은 거절됐다. 실행 프로세스에서 `NoNewPrivs=1`, 유효 capability 0, 일반 사용자 UID를 확인했다. 프로젝트 지침에 넣은 표식도 모델 입력에 나타나지 않았다.
+
+제한된 SSH 키로 합성 변경을 전달하자 구독 모델이 `sum(set(items))`에서 중복 가격이 누락되는 결함을 지적했다. 검증자가 추가한 회귀 테스트에서 입력 `[100, 100]`의 기대값 200과 실제값 100이 달랐다. 합산을 수정한 뒤 샘플 테스트 3개가 모두 통과했고 같은 모델의 재리뷰 결과는 `verified`(지적 0건)였다. 이 실행은 서버의 리뷰 경로를 검증했다.
+
+같은 결함 커밋으로 비공개 샘플에 초안 PR을 열자 `pull_request_target` 이벤트가 `entry` 작업을 시작했다. 게시용 App을 설정하지 않은 환경에서 토큰 발급이 `appId option is required`로 실패했고, 후속 작업 76개는 건너뛰었다. 별도로 기본 브랜치 보호 API를 조회했을 때 GitHub는 현재 플랜에서 HTTP 403을 반환했다. PR에서 worker 호출과 필수 검사에 의한 머지 차단은 미검증 상태다.
+
 ## 운영 활성화 증거
 
 격리 보고서는 `status`, `policy_digest`(전용 config.toml의 SHA-256), `codex_version`, `mode`, `runner`, `checks`를 기록한다. `checks`는 secret_read_denied / network_denied / instructions_inert / privilege_escalation_denied 각각의 실제 검사 결과다. 단순 파일 수정으로 true를 채우는 절차는 운영 검증이 아니다. 실제 도구 권한으로 읽기·네트워크·권한 상승·시작 지침을 검사하고 원본 증거를 연결한다.
